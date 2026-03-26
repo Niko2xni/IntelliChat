@@ -49,6 +49,11 @@ def dashboard(request):
     return render(request, 'dashboard/index.html', context)
 
 
+def admin_profile(request):
+    """Admin profile page."""
+    return render(request, 'dashboard/profile.html')
+
+
 @require_http_methods(["GET"])
 def get_chart_data(request):
     """API endpoint to get chart data."""

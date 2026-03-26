@@ -5,6 +5,7 @@ app_name = 'dashboard'
 
 urlpatterns = [
     path('', views.dashboard, name='index'),
+    path('profile/', views.admin_profile, name='profile'),
     path('api/chart-data/', views.get_chart_data, name='chart_data'),
     path('api/inquiries-data/', views.get_inquiries_data, name='inquiries_data'),
     path('api/update-metrics/', views.update_metrics, name='update_metrics'),
