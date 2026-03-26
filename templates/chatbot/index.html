@@ -58,26 +58,43 @@
 
     <main class="chat-area">
 
-        <div class="welcome-message">
-            <h3>Hi, Full Name</h3>
-            <h1>How can we help?</h1>
-        </div>
-
-        <div class="chat-input-container">
-
-            <label for="file-upload" class="paperclip-icon-label">
-                <i class="fas fa-paperclip"></i>
-            </label>
-
-            <input type="file" id="file-upload" class="file-upload" multiple>
-            <div class="uploaded-files-container" id="uploadedFilesContainer"></div>
-
-            <input type="text" class="chat-input" placeholder="Ask anything">
-
-            <div class="send-button">
-                <i class="fas fa-paper-plane"></i>
+        <!-- Welcome screen (centered, visible before first message) -->
+        <div class="welcome-screen" id="welcomeScreen">
+            <div class="welcome-message">
+                <h3>Hi, Full Name</h3>
+                <h1>How can we help?</h1>
             </div>
 
+            <div class="chat-input-container">
+                <label for="file-upload" class="paperclip-icon-label">
+                    <i class="fas fa-paperclip"></i>
+                </label>
+                <input type="file" id="file-upload" class="file-upload" multiple>
+                <div class="uploaded-files-container" id="uploadedFilesContainer"></div>
+                <input type="text" class="chat-input" id="welcomeInput" placeholder="Ask anything">
+                <div class="send-button" id="welcomeSendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active chat screen (hidden until first message) -->
+        <div class="active-chat" id="activeChat" style="display: none;">
+            <div class="chat-messages" id="chatMessages"></div>
+
+            <div class="chat-input-wrapper">
+                <div class="chat-input-container">
+                    <label for="file-upload-active" class="paperclip-icon-label">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                    <input type="file" id="file-upload-active" class="file-upload" multiple>
+                    <div class="uploaded-files-container" id="uploadedFilesContainerActive"></div>
+                    <input type="text" class="chat-input" id="chatInputActive" placeholder="Ask anything">
+                    <div class="send-button" id="activeSendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </main>
@@ -85,39 +102,47 @@
 </div>
 
 <script>
-// --- Chat Messages Container ---
-// Insert a messages container before the input area
-const chatAreaEl = document.querySelector('.chat-area');
-const welcomeMsg = document.querySelector('.welcome-message');
-const inputContainer = document.querySelector('.chat-input-container');
+// --- Elements ---
+const welcomeScreen = document.getElementById('welcomeScreen');
+const activeChat = document.getElementById('activeChat');
+const chatMessages = document.getElementById('chatMessages');
 
-const messagesContainer = document.createElement('div');
-messagesContainer.className = 'chat-messages';
-chatAreaEl.insertBefore(messagesContainer, inputContainer);
+const welcomeInput = document.getElementById('welcomeInput');
+const welcomeSendBtn = document.getElementById('welcomeSendBtn');
+const chatInputActive = document.getElementById('chatInputActive');
+const activeSendBtn = document.getElementById('activeSendBtn');
+
+let chatStarted = false;
+
+function switchToActiveChat() {
+    if (!chatStarted) {
+        chatStarted = true;
+        welcomeScreen.style.display = 'none';
+        activeChat.style.display = 'flex';
+        chatInputActive.focus();
+    }
+}
 
 function addMessage(text, sender) {
-    // Hide welcome message on first interaction
-    if (welcomeMsg) welcomeMsg.style.display = 'none';
-
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-bubble ${sender}`;
     msgDiv.textContent = text;
-    messagesContainer.appendChild(msgDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
     return msgDiv;
 }
 
 // --- Send Message to Gemini ---
-const chatInput = document.querySelector('.chat-input');
-const sendBtn = document.querySelector('.send-button');
-
-async function sendMessage() {
-    const message = chatInput.value.trim();
+async function sendMessage(inputEl) {
+    const message = inputEl.value.trim();
     if (!message) return;
+
+    // Switch to active chat layout
+    switchToActiveChat();
 
     // Show user message
     addMessage(message, 'user');
-    chatInput.value = '';
+    inputEl.value = '';
 
     // Show typing indicator
     const typingDiv = addMessage('Thinking...', 'bot typing');
@@ -158,47 +183,57 @@ function getCsrfToken() {
     return '';
 }
 
-sendBtn.addEventListener('click', sendMessage);
-chatInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+// --- Event Listeners for both inputs ---
+welcomeSendBtn.addEventListener('click', () => sendMessage(welcomeInput));
+welcomeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage(welcomeInput);
+});
+
+activeSendBtn.addEventListener('click', () => sendMessage(chatInputActive));
+chatInputActive.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage(chatInputActive);
 });
 
 // --- File Upload Script ---
 let uploadedFiles = [];
 
-document.getElementById('file-upload').addEventListener('change', function(e){
-    const files = e.target.files;
-    const container = document.getElementById('uploadedFilesContainer');
+function setupFileUpload(fileInputId, containerId) {
+    document.getElementById(fileInputId).addEventListener('change', function(e) {
+        const files = e.target.files;
+        const container = document.getElementById(containerId);
 
-    for(let file of files){
-        if(file.type.startsWith('image/')){
-            const id = Date.now() + Math.random();
-            const url = URL.createObjectURL(file);
-            uploadedFiles.push({id,file,url});
+        for (let file of files) {
+            if (file.type.startsWith('image/')) {
+                const id = Date.now() + Math.random();
+                const url = URL.createObjectURL(file);
+                uploadedFiles.push({id, file, url});
 
-            const div = document.createElement('div');
-            div.className="uploaded-file";
-            div.id=id;
-            div.innerHTML = `
-                <img src="${url}">
-                <div class="delete-icon" onclick="removeFile('${id}')">
-                    <i class="fas fa-times"></i>
-                </div>
-            `;
-            container.appendChild(div);
+                const div = document.createElement('div');
+                div.className = "uploaded-file";
+                div.id = id;
+                div.innerHTML = `
+                    <img src="${url}">
+                    <div class="delete-icon" onclick="removeFile('${id}')">
+                        <i class="fas fa-times"></i>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
         }
-    }
+        e.target.value = "";
+    });
+}
 
-    e.target.value="";
-});
+setupFileUpload('file-upload', 'uploadedFilesContainer');
+setupFileUpload('file-upload-active', 'uploadedFilesContainerActive');
 
-function removeFile(id){
-    const fileElement=document.getElementById(id);
-    if(fileElement){
-        const index=uploadedFiles.findIndex(f=>f.id==id);
-        if(index>-1){
+function removeFile(id) {
+    const fileElement = document.getElementById(id);
+    if (fileElement) {
+        const index = uploadedFiles.findIndex(f => f.id == id);
+        if (index > -1) {
             URL.revokeObjectURL(uploadedFiles[index].url);
-            uploadedFiles.splice(index,1);
+            uploadedFiles.splice(index, 1);
         }
         fileElement.remove();
     }
