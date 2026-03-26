@@ -28,7 +28,6 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 
 <div class="auth-container">
 
-```
 <div class="auth-card">
 
     <div class="auth-form">
@@ -36,18 +35,28 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
         <h2>Login</h2>
         <p class="auth-subtitle">Neque porro quisquam est qui dolorem ipsum</p>
 
-        <form method="POST">
+        {% if errors.general %}
+        <div class="error-banner">
+            <i class="fas fa-exclamation-circle"></i> {{ errors.general }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{% url 'login' %}">
             {% csrf_token %}
 
             <!-- EMAIL -->
             <div class="form-group">
-                <div class="input-wrapper">
+                <div class="input-wrapper {% if errors.email %}input-error{% endif %}">
                     <i class="fas fa-envelope"></i>
                     <input type="email"
                            name="email"
                            placeholder="TIP e-mail"
+                           value="{{ email_value }}"
                            required>
                 </div>
+                {% if errors.email %}
+                <span class="error-message">{{ errors.email }}</span>
+                {% endif %}
             </div>
 
             <div class="form-links">
@@ -57,14 +66,18 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 
             <!-- PASSWORD -->
             <div class="form-group">
-                <div class="input-wrapper">
+                <div class="input-wrapper {% if errors.password %}input-error{% endif %}">
                     <i class="fas fa-lock"></i>
                     <input type="password"
                            name="password"
+                           id="loginPassword"
                            placeholder="Password"
                            required>
-                    <i class="fas fa-eye eye-icon"></i>
+                    <i class="fas fa-eye eye-icon" onclick="togglePassword('loginPassword',this)"></i>
                 </div>
+                {% if errors.password %}
+                <span class="error-message">{{ errors.password }}</span>
+                {% endif %}
             </div>
 
             <div class="form-links">
@@ -81,7 +94,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 
             <!-- BUTTON -->
             <button type="submit" class="auth-btn">
-                Sign up
+                Sign in
             </button>
 
         </form>
@@ -89,9 +102,23 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
     </div>
 
 </div>
-```
 
 </div>
+
+<script>
+function togglePassword(fieldId, icon) {
+    const field = document.getElementById(fieldId);
+    if (field.type === "password") {
+        field.type = "text";
+        icon.classList.remove("fa-eye");
+        icon.classList.add("fa-eye-slash");
+    } else {
+        field.type = "password";
+        icon.classList.remove("fa-eye-slash");
+        icon.classList.add("fa-eye");
+    }
+}
+</script>
 
 </body>
 </html>

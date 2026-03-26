@@ -22,6 +22,12 @@
 <h2>Register</h2>
 <p class="auth-subtitle">Neque porro quisquam est qui dolorem ipsum</p>
 
+{% if errors.general %}
+<div class="error-banner">
+    <i class="fas fa-exclamation-circle"></i> {{ errors.general }}
+</div>
+{% endif %}
+
 <form class="signup-form" id="signupForm" method="POST" action="{% url 'signup' %}">
 {% csrf_token %}
 
@@ -36,20 +42,28 @@
 <div class="form-group">
 <label for="firstName">First name</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.firstName %}input-error{% endif %}">
 <i class="fas fa-user"></i>
-<input type="text" id="firstName" name="firstName" placeholder="First name" required>
+<input type="text" id="firstName" name="firstName" placeholder="First name"
+       value="{{ form_data.first_name }}" required>
 </div>
+{% if errors.firstName %}
+<span class="error-message">{{ errors.firstName }}</span>
+{% endif %}
 
 </div>
 
 <div class="form-group">
 <label for="lastName">Last name</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.lastName %}input-error{% endif %}">
 <i class="fas fa-user"></i>
-<input type="text" id="lastName" name="lastName" placeholder="Last name" required>
+<input type="text" id="lastName" name="lastName" placeholder="Last name"
+       value="{{ form_data.last_name }}" required>
 </div>
+{% if errors.lastName %}
+<span class="error-message">{{ errors.lastName }}</span>
+{% endif %}
 
 </div>
 
@@ -70,16 +84,20 @@
 
 <label for="email">TIP e-mail</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.email %}input-error{% endif %}">
 <i class="fas fa-envelope"></i>
 <input type="email"
        id="email"
        name="email"
        placeholder="TIP e-mail"
+       value="{{ form_data.email }}"
        pattern="^[a-zA-Z0-9._%+-]+@tip\.edu\.ph$"
        title="Please use a TIP email"
        required>
 </div>
+{% if errors.email %}
+<span class="error-message">{{ errors.email }}</span>
+{% endif %}
 
 </div>
 
@@ -87,10 +105,18 @@
 
 <label for="studentNumber">Student number</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.studentNumber %}input-error{% endif %}">
 <i class="fas fa-id-card"></i>
-<input type="text" id="studentNumber" name="studentNumber" placeholder="Student number" required>
+<input type="text" id="studentNumber" name="studentNumber" placeholder="7-digit student number"
+       value="{{ form_data.student_number }}"
+       pattern="^\d{7}$"
+       title="Must be exactly 7 digits"
+       maxlength="7"
+       required>
 </div>
+{% if errors.studentNumber %}
+<span class="error-message">{{ errors.studentNumber }}</span>
+{% endif %}
 
 </div>
 
@@ -104,11 +130,15 @@
 
 <label for="password">Password</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.password %}input-error{% endif %}">
 <i class="fas fa-lock"></i>
-<input type="password" id="password" name="password" placeholder="Password" required>
+<input type="password" id="password" name="password" placeholder="Minimum 8 characters"
+       minlength="8" required>
 <i class="fas fa-eye eye-icon" onclick="togglePassword('password',this)"></i>
 </div>
+{% if errors.password %}
+<span class="error-message">{{ errors.password }}</span>
+{% endif %}
 
 </div>
 
@@ -116,11 +146,14 @@
 
 <label for="confirmPassword">Re-enter password</label>
 
-<div class="input-wrapper">
+<div class="input-wrapper {% if errors.confirmPassword %}input-error{% endif %}">
 <i class="fas fa-lock"></i>
 <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter password" required>
 <i class="fas fa-eye eye-icon" onclick="togglePassword('confirmPassword',this)"></i>
 </div>
+{% if errors.confirmPassword %}
+<span class="error-message">{{ errors.confirmPassword }}</span>
+{% endif %}
 
 </div>
 
@@ -158,42 +191,22 @@ function togglePassword(fieldId,icon){
     }
 }
 
-const form=document.querySelector(".signup-form");
-const email=document.getElementById("email");
-const password=document.getElementById("password");
-const confirmPassword=document.getElementById("confirmPassword");
+// Client-side password match check (server-side is the authority)
+const form = document.getElementById("signupForm");
+const password = document.getElementById("password");
+const confirmPassword = document.getElementById("confirmPassword");
 
-email.addEventListener("input",()=>email.setCustomValidity(""));
-password.addEventListener("input",()=>confirmPassword.setCustomValidity(""));
-confirmPassword.addEventListener("input",()=>confirmPassword.setCustomValidity(""));
-
-form.addEventListener("submit",function(e){
-    e.preventDefault();
-
-    email.setCustomValidity("");
-    confirmPassword.setCustomValidity("");
-
-    if(!form.checkValidity()){
-        return;
-    }
-
-    const emailValue=email.value.trim().toLowerCase();
-
-    if(!emailValue.endsWith("@tip.edu.ph")){
-        email.setCustomValidity("Must be a TIP Email");
-        email.reportValidity();
-        return;
-    }
-
-    if(password.value!==confirmPassword.value){
+form.addEventListener("submit", function(e) {
+    if (password.value !== confirmPassword.value) {
+        e.preventDefault();
         confirmPassword.setCustomValidity("Passwords do not match");
         confirmPassword.reportValidity();
-        return;
+    } else {
+        confirmPassword.setCustomValidity("");
     }
-
-    window.location.href = "{% url 'chatbot_home' %}";
 });
 
+confirmPassword.addEventListener("input", () => confirmPassword.setCustomValidity(""));
 </script>
 
 </body>
