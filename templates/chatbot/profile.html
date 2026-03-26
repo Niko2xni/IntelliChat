@@ -66,8 +66,8 @@
 </div>
 
 <div class="profile-info">
-<h2>Full Name</h2>
-<p>email@tip.edu.ph</p>
+<h2>{{ user.first_name }} {{ user.last_name }}</h2>
+<p>{{ user.email }}</p>
 
 <button class="upload-btn" onclick="openFileManager()">
 Upload Image
@@ -122,9 +122,12 @@ General
 Delete Account
 </button>
 
-<button class="logout-btn">
+<form method="POST" action="{% url 'logout' %}" style="display:inline;">
+{% csrf_token %}
+<button type="submit" class="logout-btn">
 Logout
 </button>
+</form>
 
 </div>
 
@@ -149,20 +152,21 @@ profileArea.classList.toggle('full-width');
 });
 
 // Toggle announcements popup
-notifIcon.addEventListener('click', (e) => {
-e.preventDefault();
-e.stopPropagation();
-announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
-});
+if (notifIcon && announcementsPopup) {
+    notifIcon.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
+    });
 
-// Close popup when clicking outside
-document.addEventListener('click', (e) => {
-if (announcementsPopup.style.display === 'block' && 
-    !notifIcon.contains(e.target) && 
-    !announcementsPopup.contains(e.target)) {
-    announcementsPopup.style.display = 'none';
+    document.addEventListener('click', (e) => {
+        if (announcementsPopup.style.display === 'block' && 
+            !notifIcon.contains(e.target) && 
+            !announcementsPopup.contains(e.target)) {
+            announcementsPopup.style.display = 'none';
+        }
+    });
 }
-});
 
 /* OPEN FILE MANAGER */
 function openFileManager(){
