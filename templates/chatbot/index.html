@@ -85,6 +85,84 @@
 </div>
 
 <script>
+// --- Chat Messages Container ---
+// Insert a messages container before the input area
+const chatAreaEl = document.querySelector('.chat-area');
+const welcomeMsg = document.querySelector('.welcome-message');
+const inputContainer = document.querySelector('.chat-input-container');
+
+const messagesContainer = document.createElement('div');
+messagesContainer.className = 'chat-messages';
+chatAreaEl.insertBefore(messagesContainer, inputContainer);
+
+function addMessage(text, sender) {
+    // Hide welcome message on first interaction
+    if (welcomeMsg) welcomeMsg.style.display = 'none';
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-bubble ${sender}`;
+    msgDiv.textContent = text;
+    messagesContainer.appendChild(msgDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    return msgDiv;
+}
+
+// --- Send Message to Gemini ---
+const chatInput = document.querySelector('.chat-input');
+const sendBtn = document.querySelector('.send-button');
+
+async function sendMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+
+    // Show user message
+    addMessage(message, 'user');
+    chatInput.value = '';
+
+    // Show typing indicator
+    const typingDiv = addMessage('Thinking...', 'bot typing');
+
+    try {
+        const response = await fetch('/chatbot/ask/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
+            },
+            body: JSON.stringify({ message }),
+        });
+
+        const data = await response.json();
+
+        // Remove typing indicator
+        typingDiv.remove();
+
+        if (data.response) {
+            addMessage(data.response, 'bot');
+        } else if (data.error) {
+            addMessage('Error: ' + data.error, 'bot error');
+        }
+    } catch (err) {
+        typingDiv.remove();
+        addMessage('Something went wrong. Please try again.', 'bot error');
+    }
+}
+
+// Get CSRF token from cookies (Django requirement)
+function getCsrfToken() {
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'csrftoken') return value;
+    }
+    return '';
+}
+
+sendBtn.addEventListener('click', sendMessage);
+chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+
 // --- File Upload Script ---
 let uploadedFiles = [];
 
@@ -140,21 +218,21 @@ menuIcon.addEventListener('click', () => {
 const notifIcon = document.querySelector('.notif-icon');
 const announcementsPopup = document.getElementById('announcementsPopup');
 
-// Toggle announcements popup
-notifIcon.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
-});
+if (notifIcon && announcementsPopup) {
+    notifIcon.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
+    });
 
-// Close popup when clicking outside
-document.addEventListener('click', (e) => {
-    if (announcementsPopup.style.display === 'block' && 
-        !notifIcon.contains(e.target) && 
-        !announcementsPopup.contains(e.target)) {
-        announcementsPopup.style.display = 'none';
-    }
-});
+    document.addEventListener('click', (e) => {
+        if (announcementsPopup.style.display === 'block' && 
+            !notifIcon.contains(e.target) && 
+            !announcementsPopup.contains(e.target)) {
+            announcementsPopup.style.display = 'none';
+        }
+    });
+}
 </script>
 
 </body>
