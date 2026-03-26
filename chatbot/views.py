@@ -34,7 +34,11 @@ def login_view(request):
             user = authenticate(request, username=email, password=password)
             if user is not None:
                 login(request, user)
-                return redirect('chatbot_home')
+                # Redirect based on role
+                if user.is_staff:
+                    return redirect('dashboard:index')
+                else:
+                    return redirect('chatbot_home')
             else:
                 errors['general'] = 'Invalid email or password.'
 
@@ -80,8 +84,12 @@ def signup_view(request):
         if not confirm_password:
             errors['confirmPassword'] = 'Please re-enter your password.'
 
+        # Block admin email domain on signup
+        if email and email.endswith('@intellichat.com'):
+            errors['email'] = 'Admin accounts cannot be created here.'
+
         # Email must be @tip.edu.ph
-        if email and not email.endswith('@tip.edu.ph'):
+        if email and 'email' not in errors and not email.endswith('@tip.edu.ph'):
             errors['email'] = 'Must be a TIP email (@tip.edu.ph).'
 
         # Student number must be exactly 7 digits
