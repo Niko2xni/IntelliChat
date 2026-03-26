@@ -61,7 +61,11 @@
         <!-- Welcome screen (centered, visible before first message) -->
         <div class="welcome-screen" id="welcomeScreen">
             <div class="welcome-message">
-                <h3>Hi, Full Name</h3>
+                {% if user.is_authenticated %}
+                <h3>Hi, {{ user.first_name }}</h3>
+                {% else %}
+                <h3>Hi, Guest</h3>
+                {% endif %}
                 <h1>How can we help?</h1>
             </div>
 

@@ -36,6 +36,7 @@ def login_view(request):
                 login(request, user)
                 # Redirect based on role
                 if user.is_staff:
+                    request.session.set_expiry(0)  # Session expires when browser is closed
                     return redirect('dashboard:index')
                 else:
                     return redirect('chatbot_home')

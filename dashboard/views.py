@@ -3,10 +3,17 @@ from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
+from django.contrib.auth.decorators import user_passes_test
 from .models import DashboardMetrics, CommonInquiry, ResponseTimeData, FAQ, Document
 import json
 
 
+def is_admin(user):
+    """Check if the user is an active administrator."""
+    return user.is_active and user.is_staff
+
+
+@user_passes_test(is_admin, login_url='login')
 def dashboard(request):
     """Main admin dashboard view."""
     try:
@@ -48,12 +55,13 @@ def dashboard(request):
     
     return render(request, 'dashboard/index.html', context)
 
-
+@user_passes_test(is_admin, login_url='login')
 def admin_profile(request):
     """Admin profile page."""
     return render(request, 'dashboard/profile.html')
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET"])
 def get_chart_data(request):
     """API endpoint to get chart data."""
@@ -67,6 +75,7 @@ def get_chart_data(request):
     return JsonResponse(data)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET"])
 def get_inquiries_data(request):
     """API endpoint to get common inquiries data."""
@@ -80,6 +89,7 @@ def get_inquiries_data(request):
     return JsonResponse(data)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET", "POST"])
 @csrf_exempt
 def update_metrics(request):
@@ -106,7 +116,7 @@ def update_metrics(request):
     
     return JsonResponse({'status': 'error', 'message': 'Only POST is allowed'}, status=405)
 
-
+@user_passes_test(is_admin, login_url='login')
 def knowledge_base(request):
     """Knowledge Base management page."""
     faqs = FAQ.objects.filter(is_active=True).order_by('-created_at')
@@ -124,6 +134,7 @@ def knowledge_base(request):
     return render(request, 'dashboard/knowledge_base.html', context)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET"])
 def search_faqs(request):
     """API endpoint to search FAQs."""
@@ -163,6 +174,7 @@ def search_faqs(request):
     return JsonResponse({'faqs': data})
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
 @csrf_exempt
 def add_faq(request):
@@ -184,6 +196,7 @@ def add_faq(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
 @csrf_exempt
 def update_faq(request, faq_id):
@@ -205,6 +218,7 @@ def update_faq(request, faq_id):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["DELETE"])
 @csrf_exempt
 def delete_faq(request, faq_id):
@@ -220,6 +234,7 @@ def delete_faq(request, faq_id):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
+@user_passes_test(is_admin, login_url='login')
 def documents(request):
     """Document Management page."""
     docs = Document.objects.filter(status__in=['active', 'draft']).order_by('-created_at')
@@ -243,6 +258,7 @@ def documents(request):
     return render(request, 'dashboard/documents.html', context)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET"])
 def search_documents(request):
     """API endpoint to search documents."""
@@ -281,6 +297,7 @@ def search_documents(request):
     return JsonResponse({'documents': data})
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
 @csrf_exempt
 def upload_document(request):
@@ -316,6 +333,7 @@ def upload_document(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
+@user_passes_test(is_admin, login_url='login')
 @require_http_methods(["DELETE"])
 @csrf_exempt
 def delete_document(request, doc_id):

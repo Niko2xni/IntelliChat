@@ -66,21 +66,26 @@
 </div>
 
 <div class="profile-info">
-<h2>{{ user.first_name }} {{ user.last_name }}</h2>
-<p>{{ user.email }}</p>
+{% if user.is_authenticated %}
+    <h2>{{ user.first_name }} {{ user.last_name }}</h2>
+    <p>{{ user.email }}</p>
 
-<button class="upload-btn" onclick="openFileManager()">
-Upload Image
-</button>
+    <button class="upload-btn" onclick="openFileManager()">
+    Upload Image
+    </button>
 
-<!-- Hidden File Input -->
-<input type="file" id="imageUpload" accept="image/*" style="display:none">
-
+    <!-- Hidden File Input -->
+    <input type="file" id="imageUpload" accept="image/*" style="display:none">
+{% else %}
+    <h2>Guest</h2>
+    <p>Guest Session</p>
+{% endif %}
 </div>
 
 </div>
 
 
+{% if user.is_authenticated %}
 <h3 class="settings-title">Account Settings</h3>
 
 <div class="settings-note">
@@ -115,9 +120,11 @@ General
 
 </div>
 
+</div>
+{% endif %}
 
 <div class="profile-actions">
-
+{% if user.is_authenticated %}
 <button class="delete-btn">
 Delete Account
 </button>
@@ -128,7 +135,13 @@ Delete Account
 Logout
 </button>
 </form>
-
+{% else %}
+<a href="{% url 'login' %}" style="text-decoration:none;">
+<button class="logout-btn">
+Log In
+</button>
+</a>
+{% endif %}
 </div>
 
 </div>
