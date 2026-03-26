@@ -1,0 +1,161 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IntelliChat</title>
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+</head>
+
+<body>
+
+<header class="header">
+    <div class="header-content">
+
+        <!-- Menu Icon on the left -->
+        <div class="menu-icon">
+            <i class="fas fa-bars"></i>
+        </div>
+
+        <!-- Logo in the center -->
+        <h1 class="logo">
+            <img src="{% static 'images/logo.png' %}">
+        </h1>
+
+        <!-- Header Icons on the right -->
+        <div class="header-icons">
+    <!-- Notification Icon -->
+            <a href="#" class="header-icon notif-icon">
+                <i class="fas fa-bell"></i>
+                <span class="notif-badge"><!-- Number of notif --></span>
+            </a>
+
+            <!-- Profile Icon -->
+            <a href="{% url 'profile' %}" class="header-icon profile-icon">
+                <img src="{% static 'images/profile.png' %}" alt="Profile">
+            </a>
+        </div>
+
+    </div>
+</header>
+
+
+
+<div class="main-container">
+
+    <aside class="sidebar">
+
+        <div class="sidebar-item active">
+            <i class="fas fa-plus"></i>
+            <span>New chat</span>
+        </div>
+
+    </aside>
+
+    <main class="chat-area">
+
+        <div class="welcome-message">
+            <h3>Hi, Full Name</h3>
+            <h1>How can we help?</h1>
+        </div>
+
+        <div class="chat-input-container">
+
+            <label for="file-upload" class="paperclip-icon-label">
+                <i class="fas fa-paperclip"></i>
+            </label>
+
+            <input type="file" id="file-upload" class="file-upload" multiple>
+            <div class="uploaded-files-container" id="uploadedFilesContainer"></div>
+
+            <input type="text" class="chat-input" placeholder="Ask anything">
+
+            <div class="send-button">
+                <i class="fas fa-paper-plane"></i>
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+<script>
+// --- File Upload Script ---
+let uploadedFiles = [];
+
+document.getElementById('file-upload').addEventListener('change', function(e){
+    const files = e.target.files;
+    const container = document.getElementById('uploadedFilesContainer');
+
+    for(let file of files){
+        if(file.type.startsWith('image/')){
+            const id = Date.now() + Math.random();
+            const url = URL.createObjectURL(file);
+            uploadedFiles.push({id,file,url});
+
+            const div = document.createElement('div');
+            div.className="uploaded-file";
+            div.id=id;
+            div.innerHTML = `
+                <img src="${url}">
+                <div class="delete-icon" onclick="removeFile('${id}')">
+                    <i class="fas fa-times"></i>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+    }
+
+    e.target.value="";
+});
+
+function removeFile(id){
+    const fileElement=document.getElementById(id);
+    if(fileElement){
+        const index=uploadedFiles.findIndex(f=>f.id==id);
+        if(index>-1){
+            URL.revokeObjectURL(uploadedFiles[index].url);
+            uploadedFiles.splice(index,1);
+        }
+        fileElement.remove();
+    }
+}
+
+// --- Sidebar Toggle Script ---
+const menuIcon = document.querySelector('.menu-icon');
+const sidebar = document.querySelector('.sidebar');
+const chatArea = document.querySelector('.chat-area');
+
+menuIcon.addEventListener('click', () => {
+    sidebar.classList.toggle('hidden');
+    chatArea.classList.toggle('full-width');
+});
+
+// --- Announcements Popup Script ---
+const notifIcon = document.querySelector('.notif-icon');
+const announcementsPopup = document.getElementById('announcementsPopup');
+
+// Toggle announcements popup
+notifIcon.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
+});
+
+// Close popup when clicking outside
+document.addEventListener('click', (e) => {
+    if (announcementsPopup.style.display === 'block' && 
+        !notifIcon.contains(e.target) && 
+        !announcementsPopup.contains(e.target)) {
+        announcementsPopup.style.display = 'none';
+    }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,71 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IntelliChat</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="auth">
+    <a href="{% url 'login' %}" class="auth-link-btn">SIGN IN</a>
+<a href="{% url 'signup' %}" class="auth-link-btn">SIGN UP</a>
+    </div>
+</div>
+
+{% load static %}
+<section class="hero">
+    <div class="overlay">
+        <h1 class="logo">
+            <img src="{% static 'images/logo.png' %}" alt="Logo">
+        </h1>
+        <p>
+            Lorem ipsum dolor sit amet consectetur adipiscing elit.
+            Dolor sit amet consectetur adipiscing elit quisque faucibus.
+        </p>
+        <a href="/chatbot/"><button class="start-btn">START NOW</button></a>
+    </div>
+</section>
+
+<section class="features">
+
+    <a href="#" class="card-link">
+    <div class="card">
+        <div class="icon">
+            <img src="{% static 'images/search-icon.png' %}" alt="Search">
+        </div>
+        <h2>Lorem ipsum</h2>
+        <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium</p>
+    </div>
+</a>
+
+<a href="#" class="card-link">
+    <div class="card">
+        <div class="icon">
+            <img src="{% static 'images/user-icon.png' %}" alt="User">
+        </div>
+        <h2>Totam rem aperiam</h2>
+        <p>Cum sociis natoque penatibus et magnis dis parturient montes.</p>
+    </div>
+</a>
+
+<a href="#" class="card-link">
+    <div class="card">
+        <div class="icon">
+            <img src="{% static 'images/chat-icon.png' %}" alt="Chat">
+        </div>
+        <h2>Donec quam felis</h2>
+        <p>Nemo enim ipsam voluptatem. Adjsnd enim. Nemo enim ipsam. </p>
+    </div>
+</a>
+
+</section>
+
+<footer>
+    <div>Lorem ipsum dolor <br> sit amet consectetur adipiscing <br> elit quisque faucibus.</div>
+    <div>Lorem ipsum dolor<br> sit amet consectetur<br> adipiscing elit.</div>
+</footer>
+
+</body>
+</html>

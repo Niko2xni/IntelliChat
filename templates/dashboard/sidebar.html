@@ -1,0 +1,33 @@
+{% load static %}
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <button class="sidebar-toggle">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </div>
+    
+    <nav class="sidebar-nav">
+        <ul>
+            <li>
+                <a href="{% url 'dashboard:index' %}" class="nav-item active">
+                    <span class="icon">📊</span>
+                    <span class="label">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'dashboard:knowledge_base' %}" class="nav-item">
+                    <span class="icon">📚</span>
+                    <span class="label">Knowledge Base</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'dashboard:documents' %}" class="nav-item">
+                    <span class="icon">📄</span>
+                    <span class="label">Documents</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</aside>

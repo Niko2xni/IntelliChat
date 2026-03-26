@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Profile | IntelliChat</title>
+
+<link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+</head>
+
+<body>
+
+<header class="header">
+<div class="header-content">
+
+<div class="menu-icon">
+<i class="fas fa-bars"></i>
+</div>
+
+<h1 class="logo">
+<img src="{% static 'images/logo.png' %}">
+</h1>
+
+<div class="header-icons">
+
+<a href="#" class="header-icon notif-icon">
+<i class="fas fa-bell"></i>
+<span class="notif-badge"></span>
+</a>
+
+<a href="{% url 'profile' %}" class="header-icon profile-icon">
+<img src="{% static 'images/profile.png' %}">
+</a>
+
+</div>
+
+</div>
+</header>
+
+
+
+<div class="main-container">
+
+<aside class="sidebar">
+
+<div class="sidebar-item">
+<i class="fas fa-plus"></i>
+<span>New chat</span>
+</div>
+
+
+</aside>
+
+
+<main class="profile-area">
+
+<div class="profile-card">
+
+<div class="profile-header">
+
+<div class="profile-image">
+<img id="profilePreview" src="{% static 'images/profile.png' %}">
+</div>
+
+<div class="profile-info">
+<h2>Full Name</h2>
+<p>email@tip.edu.ph</p>
+
+<button class="upload-btn" onclick="openFileManager()">
+Upload Image
+</button>
+
+<!-- Hidden File Input -->
+<input type="file" id="imageUpload" accept="image/*" style="display:none">
+
+</div>
+
+</div>
+
+
+<h3 class="settings-title">Account Settings</h3>
+
+<div class="settings-note">
+<strong>Note:</strong> Personal information such as full name and TIP email cannot be personally changed.
+</div>
+
+
+<div class="settings-row">
+
+<div class="settings-box">
+
+<label>Account Type</label>
+
+<div class="settings-input">
+General
+<i class="fas fa-question-circle"></i>
+</div>
+
+<a href="#" class="small-link">Contact admin</a>
+
+</div>
+
+
+<div class="settings-box">
+
+<label>Password</label>
+
+<div class="settings-input">********</div>
+<a href="#" class="small-link">Change password</a>
+
+</div>
+
+</div>
+
+
+<div class="profile-actions">
+
+<button class="delete-btn">
+Delete Account
+</button>
+
+<button class="logout-btn">
+Logout
+</button>
+
+</div>
+
+</div>
+
+</main>
+
+</div>
+
+
+<script>
+
+const menuIcon = document.querySelector('.menu-icon');
+const sidebar = document.querySelector('.sidebar');
+const profileArea = document.querySelector('.profile-area');
+const notifIcon = document.querySelector('.notif-icon');
+const announcementsPopup = document.getElementById('announcementsPopup');
+
+menuIcon.addEventListener('click', () => {
+sidebar.classList.toggle('hidden');
+profileArea.classList.toggle('full-width');
+});
+
+// Toggle announcements popup
+notifIcon.addEventListener('click', (e) => {
+e.preventDefault();
+e.stopPropagation();
+announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
+});
+
+// Close popup when clicking outside
+document.addEventListener('click', (e) => {
+if (announcementsPopup.style.display === 'block' && 
+    !notifIcon.contains(e.target) && 
+    !announcementsPopup.contains(e.target)) {
+    announcementsPopup.style.display = 'none';
+}
+});
+
+/* OPEN FILE MANAGER */
+function openFileManager(){
+document.getElementById("imageUpload").click();
+}
+
+
+/* PREVIEW SELECTED IMAGE */
+const imageUpload = document.getElementById("imageUpload");
+const profilePreview = document.getElementById("profilePreview");
+
+imageUpload.addEventListener("change", function(){
+
+const file = this.files[0];
+
+if(file){
+
+const reader = new FileReader();
+
+reader.onload = function(e){
+profilePreview.src = e.target.result;
+}
+
+reader.readAsDataURL(file);
+
+}
+
+});
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,398 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Knowledge Base - IntelliChat{% endblock %}
+
+{% block content %}
+<div class="knowledge-base-container">
+    <div class="kb-header">
+        <h2>Knowledge Base Management</h2>
+        <p>Manage FAQs and help content for IntelliChat</p>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="kb-controls">
+        <div class="search-section">
+            <div class="search-input-wrapper">
+                <input type="text" id="searchInput" placeholder="Search FAQs..." class="search-input">
+                <button id="searchBtn" class="search-btn">
+                    <span class="search-icon">🔍</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="filter-section">
+            <select id="categoryFilter" class="filter-select">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                <option value="{{ category }}">{{ category|title }}</option>
+                {% endfor %}
+            </select>
+
+            <select id="tagFilter" class="filter-select">
+                <option value="">All Tags</option>
+                {% for tag in tags %}
+                <option value="{{ tag }}">{{ tag }}</option>
+                {% endfor %}
+            </select>
+
+            <button id="addFaqBtn" class="btn-primary">
+                <span class="plus-icon">+</span>
+                Add FAQ
+            </button>
+        </div>
+    </div>
+
+    <!-- FAQ List -->
+    <div class="faq-list" id="faqList">
+        {% for faq in faqs %}
+        <div class="faq-item" data-id="{{ faq.id }}">
+            <div class="faq-header">
+                <h3 class="faq-question">{{ faq.question }}</h3>
+                <div class="faq-actions">
+                    <span class="faq-category category-{{ faq.category }}">{{ faq.category|title }}</span>
+                    <button class="edit-btn" data-id="{{ faq.id }}">
+                        <span class="edit-icon">✏️</span>
+                    </button>
+                    <button class="delete-btn" data-id="{{ faq.id }}">
+                        <span class="delete-icon">🗑️</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="faq-content">
+                <p class="faq-answer">{{ faq.answer }}</p>
+                <div class="faq-meta">
+                    <div class="faq-tags">
+                        {% for tag in faq.get_tags_list %}
+                        <span class="tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="faq-stats">
+                        <span class="view-count">👁️ {{ faq.view_count }} views</span>
+                        <span class="created-date">📅 {{ faq.created_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState" style="display: none;">
+        <div class="empty-icon">📚</div>
+        <h3>No FAQs Found</h3>
+        <p>Try adjusting your search or filters, or add a new FAQ.</p>
+    </div>
+</div>
+
+<!-- Add/Edit FAQ Modal -->
+<div id="faqModal" class="modal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add New FAQ</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+
+        <form id="faqForm">
+            <div class="form-group">
+                <label for="question">Question *</label>
+                <input type="text" id="question" name="question" required>
+            </div>
+
+            <div class="form-group">
+                <label for="answer">Answer *</label>
+                <textarea id="answer" name="answer" rows="4" required></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="general">General</option>
+                    <option value="technical">Technical</option>
+                    <option value="billing">Billing</option>
+                    <option value="account">Account</option>
+                    <option value="features">Features</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="tags">Tags (comma-separated)</label>
+                <input type="text" id="tags" name="tags" placeholder="e.g., login, password, help">
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary cancel-btn">Cancel</button>
+                <button type="submit" class="btn-primary">Save FAQ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal">
+    <div class="modal-content small">
+        <div class="modal-header">
+            <h3>Delete FAQ</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+
+        <div class="modal-body">
+            <p>Are you sure you want to delete this FAQ? This action cannot be undone.</p>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-secondary cancel-delete">Cancel</button>
+            <button class="btn-danger confirm-delete">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Knowledge Base JavaScript functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const tagFilter = document.getElementById('tagFilter');
+    const addFaqBtn = document.getElementById('addFaqBtn');
+    const faqList = document.getElementById('faqList');
+    const emptyState = document.getElementById('emptyState');
+    const faqModal = document.getElementById('faqModal');
+    const deleteModal = document.getElementById('deleteModal');
+    const faqForm = document.getElementById('faqForm');
+
+    let currentEditingId = null;
+    let faqToDelete = null;
+
+    // Search functionality
+    function performSearch() {
+        const query = searchInput.value.trim();
+        const category = categoryFilter.value;
+        const tag = tagFilter.value;
+
+        const params = new URLSearchParams();
+        if (query) params.append('q', query);
+        if (category) params.append('category', category);
+        if (tag) params.append('tag', tag);
+
+        fetch(`/dashboard/api/search-faqs/?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                updateFaqList(data.faqs);
+            })
+            .catch(error => {
+                console.error('Search error:', error);
+                showNotification('Search failed. Please try again.', 'error');
+            });
+    }
+
+    // Update FAQ list
+    function updateFaqList(faqs) {
+        if (faqs.length === 0) {
+            faqList.innerHTML = '';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        faqList.innerHTML = faqs.map(faq => `
+            <div class="faq-item" data-id="${faq.id}">
+                <div class="faq-header">
+                    <h3 class="faq-question">${faq.question}</h3>
+                    <div class="faq-actions">
+                        <span class="faq-category category-${faq.category}">${faq.category.charAt(0).toUpperCase() + faq.category.slice(1)}</span>
+                        <button class="edit-btn" data-id="${faq.id}">
+                            <span class="edit-icon">✏️</span>
+                        </button>
+                        <button class="delete-btn" data-id="${faq.id}">
+                            <span class="delete-icon">🗑️</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="faq-content">
+                    <p class="faq-answer">${faq.answer}</p>
+                    <div class="faq-meta">
+                        <div class="faq-tags">
+                            ${faq.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                        <div class="faq-stats">
+                            <span class="view-count">👁️ ${faq.view_count} views</span>
+                            <span class="created-date">📅 ${faq.created_at}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        // Reattach event listeners
+        attachEventListeners();
+    }
+
+    // Attach event listeners to dynamic elements
+    function attachEventListeners() {
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', handleEdit);
+        });
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', handleDelete);
+        });
+    }
+
+    // Handle edit button click
+    function handleEdit(e) {
+        const faqId = e.currentTarget.dataset.id;
+        const faqItem = e.currentTarget.closest('.faq-item');
+        const question = faqItem.querySelector('.faq-question').textContent;
+        const answer = faqItem.querySelector('.faq-answer').textContent;
+        const category = faqItem.querySelector('.faq-category').className.split(' ').find(c => c.startsWith('category-')).replace('category-', '');
+        const tags = Array.from(faqItem.querySelectorAll('.tag')).map(tag => tag.textContent).join(', ');
+
+        currentEditingId = faqId;
+        document.getElementById('modalTitle').textContent = 'Edit FAQ';
+        document.getElementById('question').value = question;
+        document.getElementById('answer').value = answer;
+        document.getElementById('category').value = category;
+        document.getElementById('tags').value = tags;
+
+        faqModal.style.display = 'block';
+    }
+
+    // Handle delete button click
+    function handleDelete(e) {
+        faqToDelete = e.currentTarget.dataset.id;
+        deleteModal.style.display = 'block';
+    }
+
+    // Handle form submission
+    faqForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(faqForm);
+        const data = {
+            question: formData.get('question'),
+            answer: formData.get('answer'),
+            category: formData.get('category'),
+            tags: formData.get('tags')
+        };
+
+        const url = currentEditingId
+            ? `/dashboard/api/update-faq/${currentEditingId}/`
+            : '/dashboard/api/add-faq/';
+
+        const method = currentEditingId ? 'POST' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                showNotification(result.message, 'success');
+                faqModal.style.display = 'none';
+                faqForm.reset();
+                currentEditingId = null;
+                performSearch(); // Refresh the list
+            } else {
+                showNotification(result.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Form submission error:', error);
+            showNotification('Failed to save FAQ. Please try again.', 'error');
+        });
+    });
+
+    // Handle delete confirmation
+    document.querySelector('.confirm-delete').addEventListener('click', function() {
+        if (!faqToDelete) return;
+
+        fetch(`/dashboard/api/delete-faq/${faqToDelete}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                showNotification(result.message, 'success');
+                deleteModal.style.display = 'none';
+                faqToDelete = null;
+                performSearch(); // Refresh the list
+            } else {
+                showNotification(result.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            showNotification('Failed to delete FAQ. Please try again.', 'error');
+        });
+    });
+
+    // Event listeners
+    searchBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') performSearch();
+    });
+
+    categoryFilter.addEventListener('change', performSearch);
+    tagFilter.addEventListener('change', performSearch);
+
+    addFaqBtn.addEventListener('click', function() {
+        currentEditingId = null;
+        document.getElementById('modalTitle').textContent = 'Add New FAQ';
+        faqForm.reset();
+        faqModal.style.display = 'block';
+    });
+
+    // Modal close handlers
+    document.querySelectorAll('.close-modal, .cancel-btn, .cancel-delete').forEach(el => {
+        el.addEventListener('click', function() {
+            faqModal.style.display = 'none';
+            deleteModal.style.display = 'none';
+            faqToDelete = null;
+        });
+    });
+
+    // Click outside modal to close
+    window.addEventListener('click', function(e) {
+        if (e.target === faqModal) {
+            faqModal.style.display = 'none';
+        }
+        if (e.target === deleteModal) {
+            deleteModal.style.display = 'none';
+        }
+    });
+
+    // Initial event listener attachment
+    attachEventListeners();
+
+    // Utility functions
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function showNotification(message, type) {
+        // Simple notification - you can enhance this
+        alert(message);
+    }
+});
+</script>
+{% endblock %}
