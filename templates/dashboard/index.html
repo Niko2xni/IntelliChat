@@ -16,7 +16,7 @@
                 <h3>Total Chats</h3>
                 <span class="metric-icon">💬</span>
             </div>
-            <div class="metric-value">{{ metrics.total_chats|stringformat:",d" }}</div>
+            <div class="metric-value">{{ metrics.total_chats }}</div>
             <div class="metric-change {% if metrics.chats_change >= 0 %}positive{% else %}negative{% endif %}">
                 <span class="arrow">{% if metrics.chats_change >= 0 %}📈{% else %}📉{% endif %}</span>
                 <span class="percentage">{{ metrics.chats_change|floatformat:1 }}%</span>
