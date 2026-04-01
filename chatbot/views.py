@@ -7,7 +7,9 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.contrib.auth import authenticate, login, logout
 from google import genai
 from .models import Student
-
+from django.core.mail import send_mail
+import time
+import secrets
 
 @ensure_csrf_cookie
 def chatbot_home(request):
@@ -54,6 +56,10 @@ def signup_view(request):
     form_data = {}
 
     if request.method == 'POST':
+        if not request.session.get('otp_verified'):
+            errors['general'] = "Please verify your email via OTP first."
+            return render(request, 'chatbot/signup.html', {'errors': errors})
+
         first_name = request.POST.get('firstName', '').strip()
         last_name = request.POST.get('lastName', '').strip()
         email = request.POST.get('email', '').strip().lower()
@@ -61,65 +67,30 @@ def signup_view(request):
         password = request.POST.get('password', '').strip()
         confirm_password = request.POST.get('confirmPassword', '').strip()
 
-        # Preserve form data for re-rendering
         form_data = {
-            'first_name': first_name,
-            'last_name': last_name,
-            'email': email,
-            'student_number': student_number,
+            'first_name': first_name, 'last_name': last_name,
+            'email': email, 'student_number': student_number,
         }
 
-        # --- Validation ---
+        if not all([first_name, last_name, email, student_number, password]):
+            errors['general'] = "All fields are required."
+        
+        if email != request.session.get('otp_email_target'):
+            errors['email'] = "Email mismatch. Please verify the OTP for this email."
 
-        # All fields required
-        if not first_name:
-            errors['firstName'] = 'First name is required.'
-        if not last_name:
-            errors['lastName'] = 'Last name is required.'
-        if not email:
-            errors['email'] = 'Email is required.'
-        if not student_number:
-            errors['studentNumber'] = 'Student number is required.'
-        if not password:
-            errors['password'] = 'Password is required.'
-        if not confirm_password:
-            errors['confirmPassword'] = 'Please re-enter your password.'
+        if Student.objects.filter(email=email).exists():
+            errors['email'] = 'This email is already registered.'
+        
+        if Student.objects.filter(student_number=student_number).exists():
+            errors['studentNumber'] = 'This student number is already registered.'
 
-        # Block admin email domain on signup
-        if email and email.endswith('@intellichat.com'):
-            errors['email'] = 'Admin accounts cannot be created here.'
-
-        # Email must be @tip.edu.ph
-        if email and 'email' not in errors and not email.endswith('@tip.edu.ph'):
-            errors['email'] = 'Must be a TIP email (@tip.edu.ph).'
-
-        # Student number must be exactly 7 digits
-        if student_number and not re.match(r'^\d{7}$', student_number):
-            errors['studentNumber'] = 'Student number must be exactly 7 digits.'
-
-        # Password must be at least 8 characters
-        if password and len(password) < 8:
-            errors['password'] = 'Password must be at least 8 characters.'
-
-        # Passwords must match
-        if password and confirm_password and password != confirm_password:
+        if password != confirm_password:
             errors['confirmPassword'] = 'Passwords do not match.'
 
-        # Check if email already exists
-        if email and 'email' not in errors:
-            if Student.objects.filter(email=email).exists():
-                errors['email'] = 'This email is already registered.'
-
-        # Check if student number already exists
-        if student_number and 'studentNumber' not in errors:
-            if Student.objects.filter(student_number=student_number).exists():
-                errors['studentNumber'] = 'This student number is already registered.'
-
-        # If no errors, create the user
         if not errors:
             try:
                 user = Student.objects.create_user(
-                    username=email,  # Use email as username
+                    username=email,
                     email=email,
                     password=password,
                     first_name=first_name,
@@ -127,6 +98,13 @@ def signup_view(request):
                     student_number=student_number,
                 )
                 login(request, user)
+                
+                request.session.pop('email_otp', None)
+                request.session.pop('otp_email_target', None)
+                request.session.pop('otp_verified', None)
+                request.session.pop('otp_timestamp', None)
+                request.session.modified = True
+                
                 return redirect('chatbot_home')
             except Exception as e:
                 errors['general'] = f'An error occurred: {str(e)}'
@@ -135,7 +113,6 @@ def signup_view(request):
         'errors': errors,
         'form_data': form_data,
     })
-
 
 def logout_view(request):
     logout(request)
@@ -173,3 +150,57 @@ def ask_gemini(request):
         return JsonResponse({'error': 'Invalid JSON in request body.'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+def verify_otp(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            user_otp = data.get('otp')
+            session_otp = request.session.get('email_otp')
+            otp_timestamp = request.session.get('otp_timestamp', 0)
+            
+            if time.time() - otp_timestamp > 600:  # 10 minutes validation
+                return JsonResponse({'valid': False, 'error': 'OTP has expired. Please request a new one.'})
+            
+            if session_otp and str(user_otp) == str(session_otp):
+                request.session['otp_verified'] = True
+                return JsonResponse({'valid': True})
+            request.session['otp_verified'] = False
+            return JsonResponse({'valid': False, 'error': 'Invalid verification code.'})
+        except Exception:
+            return JsonResponse({'valid': False, 'error': 'Invalid request.'}, status=400)
+
+def send_otp(request):
+    """Generates and sends an OTP to the provided email."""
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            email = data.get('email', '').strip().lower()
+            student_number = data.get('studentNumber', '').strip()
+
+            if not email.endswith('@tip.edu.ph'):
+                return JsonResponse({'success': False, 'error': 'Must be a TIP email.'})
+                
+            if Student.objects.filter(email=email).exists():
+                return JsonResponse({'success': False, 'error': 'This email is already registered.'})
+                
+            if student_number and Student.objects.filter(student_number=student_number).exists():
+                return JsonResponse({'success': False, 'error': 'This student number is already registered.'})
+
+            otp = "".join(str(secrets.randbelow(10)) for _ in range(6))
+            
+            request.session['email_otp'] = otp
+            request.session['otp_email_target'] = email
+            request.session['otp_timestamp'] = time.time()
+            request.session['otp_verified'] = False
+            
+            subject = "Your IntelliChat Verification Code"
+            message = f"Hello! Your verification code is: {otp}\n\nThis code will expire in 10 minutes."
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            send_mail(subject, message, from_email, [email], fail_silently=False)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False}, status=400)

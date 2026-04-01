@@ -176,37 +176,215 @@
 </div>
 </div>
 
+<div id="otpModal" class="otp-modal">
+    <div class="otp-modal-content">
+        <i class="fas fa-shield-alt modal-icon"></i>
+        <h3>Verify Your Email</h3>
+        <p>We've sent a 6-digit code to <span id="displayEmail" style="font-weight: bold;"></span></p>
+        
+        <div class="otp-input-group">
+            <input type="text" id="otpInput" placeholder="000000" maxlength="6">
+        </div>
+        
+        <div class="timer-section" style="margin: 15px 0; font-size: 0.9rem; color: #666;">
+            <span id="timerText">Resend code in: <span id="countdown">60</span>s</span>
+            <a href="javascript:void(0)" id="resendLink" onclick="resendOTP()" style="display: none; color: #004d40; font-weight: bold; text-decoration: none;">Resend Code</a>
+        </div>
+        
+        <div class="modal-buttons">
+            <button type="button" class="btn-verify" onclick="verifyAndSubmit()">Verify & Register</button>
+            <button type="button" class="btn-cancel" onclick="closeOtpModal()">Cancel</button>
+        </div>
+        <p id="modalError" class="error-message" style="display:none;"></p>
+    </div>
+</div>
 
 <script>
-function togglePassword(fieldId,icon){
-    const field=document.getElementById(fieldId);
-    if(field.type==="password"){
-        field.type="text";
+let isVerified = false;
+let timerInterval;
+
+function togglePassword(fieldId, icon) {
+    const field = document.getElementById(fieldId);
+    if (field.type === "password") {
+        field.type = "text";
         icon.classList.remove("fa-eye");
         icon.classList.add("fa-eye-slash");
     } else {
-        field.type="password";
+        field.type = "password";
         icon.classList.remove("fa-eye-slash");
         icon.classList.add("fa-eye");
     }
 }
 
-// Client-side password match check (server-side is the authority)
-const form = document.getElementById("signupForm");
+const signupForm = document.getElementById("signupForm");
 const password = document.getElementById("password");
 const confirmPassword = document.getElementById("confirmPassword");
+const emailField = document.getElementById("email");
+const otpModal = document.getElementById("otpModal");
+const otpInput = document.getElementById("otpInput");
+const modalError = document.getElementById("modalError");
 
-form.addEventListener("submit", function(e) {
+function validatePasswords() {
+    confirmPassword.setCustomValidity("");
+    if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
+        confirmPassword.setCustomValidity("Passwords do not match");
+    }
+}
+
+password.addEventListener("input", validatePasswords);
+confirmPassword.addEventListener("input", validatePasswords);
+emailField.addEventListener("input", () => emailField.setCustomValidity(""));
+
+function startTimer() {
+    let timeLeft = 60;
+    const countdownEl = document.getElementById("countdown");
+    const timerText = document.getElementById("timerText");
+    const resendLink = document.getElementById("resendLink");
+
+    resendLink.style.display = "none";
+    timerText.style.display = "inline";
+    countdownEl.innerText = timeLeft;
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        countdownEl.innerText = timeLeft;
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            timerText.style.display = "none";
+            resendLink.style.display = "inline";
+        }
+    }, 1000);
+}
+
+signupForm.addEventListener("submit", function (e) {
+    if (isVerified) return;
+    e.preventDefault();
+
+    confirmPassword.setCustomValidity("");
+    emailField.setCustomValidity("");
+
     if (password.value !== confirmPassword.value) {
-        e.preventDefault();
         confirmPassword.setCustomValidity("Passwords do not match");
         confirmPassword.reportValidity();
-    } else {
-        confirmPassword.setCustomValidity("");
+        return;
     }
+
+    const email = emailField.value.trim().toLowerCase();
+    if (!email.endsWith("@tip.edu.ph")) {
+        emailField.setCustomValidity("Please use a valid @tip.edu.ph email address.");
+        emailField.reportValidity();
+        return;
+    }
+
+    document.getElementById("displayEmail").innerText = email;
+    const studentNumberField = document.getElementById("studentNumber");
+    if (!studentNumberField.checkValidity()) {
+        studentNumberField.reportValidity();
+        return;
+    }
+    const studentNumber = studentNumberField.value.trim();
+    sendOTPRequest(email, studentNumber);
 });
 
-confirmPassword.addEventListener("input", () => confirmPassword.setCustomValidity(""));
+function sendOTPRequest(email, studentNumber) {
+    const submitBtn = signupForm.querySelector(".auth-btn");
+    const originalText = submitBtn.innerText;
+    submitBtn.innerText = "Sending code...";
+    submitBtn.disabled = true;
+
+    fetch("{% url 'send_otp' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, studentNumber: studentNumber })
+    })
+    .then(res => res.json())
+    .then(data => {
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+        if (data.success) {
+            otpModal.style.display = "flex";
+            startTimer();
+        } else {
+            alert(data.error || "Failed to send OTP.");
+        }
+    })
+    .catch(() => {
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+    });
+}
+
+function resendOTP() {
+    const email = emailField.value.trim().toLowerCase();
+    const studentNumber = document.getElementById("studentNumber").value.trim();
+    const resendLink = document.getElementById("resendLink");
+    resendLink.innerText = "Sending...";
+    resendLink.style.pointerEvents = "none";
+
+    fetch("{% url 'send_otp' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email, studentNumber: studentNumber })
+    })
+    .then(res => res.json())
+    .then(data => {
+        resendLink.innerText = "Resend Code";
+        resendLink.style.pointerEvents = "auto";
+        if (data.success) {
+            startTimer();
+            modalError.style.display = "none";
+        }
+    });
+}
+
+function verifyAndSubmit() {
+    modalError.style.display = "none";
+    const enteredOtp = otpInput.value.trim();
+    const verifyBtn = document.querySelector(".btn-verify");
+
+    if (enteredOtp.length !== 6) {
+        modalError.innerText = "Please enter the 6-digit code.";
+        modalError.style.display = "block";
+        return;
+    }
+
+    verifyBtn.innerText = "Verifying...";
+    verifyBtn.disabled = true;
+
+    fetch("{% url 'verify_otp' %}", {
+        method: "POST",
+        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+        body: JSON.stringify({ otp: enteredOtp })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.valid) {
+            isVerified = true;
+            signupForm.requestSubmit();
+        } else {
+            verifyBtn.innerText = "Verify & Register";
+            verifyBtn.disabled = false;
+            modalError.innerText = data.error || "Invalid OTP. Please check your email.";
+            modalError.style.display = "block";
+        }
+    })
+    .catch(() => {
+        verifyBtn.innerText = "Verify & Register";
+        verifyBtn.disabled = false;
+    });
+}
+
+function closeOtpModal() {
+    otpModal.style.display = "none";
+    modalError.style.display = "none";
+    otpInput.value = "";
+    clearInterval(timerInterval);
+}
+
+window.onclick = function (event) {
+    if (event.target === otpModal) closeOtpModal();
+};
 </script>
 
 </body>

@@ -240,3 +240,42 @@ padding:40px 25px;
 }
 
 }
+
+.otp-modal {
+    display: none; 
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.otp-modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modal-icon { font-size: 3rem; color: #007bff; margin-bottom: 15px; }
+
+.otp-input-group input {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.5rem;
+    text-align: center;
+    letter-spacing: 5px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.modal-buttons { display: flex; gap: 10px; }
+
+.btn-verify { background: #28a745; color: white; flex: 2; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+.btn-cancel { background: #dc3545; color: white; flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
