@@ -222,7 +222,11 @@ Log In
     <h3 style="margin-bottom:15px; color:#333; text-align: center;">Change Password</h3>
     
     <div id="pwdStep1">
-        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">We will send a verification code to your email to verify your identity.</p>
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">For security reasons, please enter your current password to proceed.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdCurrentInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="pwdCurrentInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
         <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="sendPwdOtp(this)">Send Verification Code</button>
         <div id="pwdStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
     </div>
@@ -298,6 +302,7 @@ function resetPwdState() {
     if(document.getElementById("pwdStep2Error")) document.getElementById("pwdStep2Error").style.display = "none";
     if(document.getElementById("pwdStep1Error")) document.getElementById("pwdStep1Error").style.display = "none";
     if(document.getElementById("pwdNewInput")) {
+        if(document.getElementById("pwdCurrentInput")) document.getElementById("pwdCurrentInput").value = "";
         document.getElementById("pwdNewInput").value = "";
         document.getElementById("pwdConfirmInput").value = "";
         document.getElementById("pwdOtpInput").value = "";
@@ -431,6 +436,9 @@ function getCookie(name) {
 }
 
 function sendPwdOtp(btn) {
+    const pwd = document.getElementById("pwdCurrentInput").value;
+    if(!pwd) return;
+    
     btn.disabled = true;
     btn.innerText = "Sending... Please wait";
     document.getElementById("pwdStep1Error").style.display = "none";
@@ -441,7 +449,7 @@ function sendPwdOtp(btn) {
             "Content-Type": "application/json",
             "X-CSRFToken": getCookie('csrftoken')
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({password: pwd})
     })
     .then(r => r.json())
     .then(data => {

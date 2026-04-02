@@ -211,6 +211,12 @@ def send_password_change_otp(request):
             return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
             
         try:
+            data = json.loads(request.body)
+            password = data.get('password', '').strip()
+            
+            if not request.user.check_password(password):
+                return JsonResponse({'success': False, 'error': 'Incorrect password.'})
+                
             email = request.user.email
             if not email:
                 return JsonResponse({'success': False, 'error': 'User has no email associated.'})
