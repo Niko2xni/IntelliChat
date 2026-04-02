@@ -391,10 +391,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // File upload handling
+    document.querySelector('#uploadForm .file-upload-area').addEventListener('click', function() {
+        docFile.click();
+    });
+
     docFile.addEventListener('change', function() {
         const fileName = this.files[0]?.name || 'No file chosen';
         const fileArea = document.querySelector('#uploadForm .file-upload-area p');
         fileArea.textContent = fileName;
+    });
+
+    document.querySelector('#editForm .file-upload-area').addEventListener('click', function() {
+        editDocFile.click();
     });
 
     editDocFile.addEventListener('change', function() {
