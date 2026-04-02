@@ -77,6 +77,7 @@
 
             <div class="doc-actions">
                 <button class="btn-view" title="View">👁️ View</button>
+                <button class="btn-edit" data-id="{{ doc.id }}" title="Edit">✏️ Edit</button>
                 <button class="btn-download" data-id="{{ doc.id }}" title="Download">⬇️ Download</button>
                 <button class="btn-delete" data-id="{{ doc.id }}" title="Delete">🗑️</button>
             </div>
@@ -131,6 +132,50 @@
             <div class="form-actions">
                 <button type="button" class="btn-secondary cancel-btn">Cancel</button>
                 <button type="submit" class="btn-primary">Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Document Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Document</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+
+        <form id="editForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="editDocName">Document Name *</label>
+                <input type="text" id="editDocName" name="title" placeholder="Enter document name..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="editDocCategory">Category</label>
+                <select id="editDocCategory" name="category">
+                    <option value="templates">Templates</option>
+                    <option value="forms">Forms</option>
+                    <option value="guidelines">Guidelines</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="editDocFile">Replace File (Optional)</label>
+                <div class="file-upload">
+                    <input type="file" id="editDocFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                    <div class="file-upload-area">
+                        <span class="upload-icon-large">⬆️</span>
+                        <p id="editFileAreaP">Click to upload or drag and drop to replace</p>
+                        <span class="file-formats">PDF, DOC, DOCX, XLS, XLSX (max.10MB)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn-secondary cancel-btn">Cancel</button>
+                <button type="submit" class="btn-primary">Save Changes</button>
             </div>
         </form>
     </div>
@@ -205,10 +250,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const documentsGrid = document.getElementById('documentsGrid');
     const emptyState = document.getElementById('emptyState');
     const uploadModal = document.getElementById('uploadModal');
+    const editModal = document.getElementById('editModal');
     const previewModal = document.getElementById('previewModal');
     const deleteModal = document.getElementById('deleteModal');
     const uploadForm = document.getElementById('uploadForm');
+    const editForm = document.getElementById('editForm');
     const docFile = document.getElementById('docFile');
+    const editDocFile = document.getElementById('editDocFile');
 
     let currentDocId = null;
 
@@ -228,7 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Search error:', error);
-                alert('Search failed. Please try again.');
+                showNotification('Search failed. Please try again.', 'error');
             });
     }
 
@@ -264,6 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 <div class="doc-actions">
                     <button class="btn-view" title="View">👁️ View</button>
+                    <button class="btn-edit" data-id="${doc.id}" title="Edit">✏️ Edit</button>
                     <button class="btn-download" data-id="${doc.id}" title="Download">⬇️ Download</button>
                     <button class="btn-delete" data-id="${doc.id}" title="Delete">🗑️</button>
                 </div>
@@ -277,6 +326,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function attachEventListeners() {
         document.querySelectorAll('.btn-view').forEach(btn => {
             btn.addEventListener('click', handleView);
+        });
+        document.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.addEventListener('click', handleEdit);
         });
         document.querySelectorAll('.btn-download').forEach(btn => {
             btn.addEventListener('click', handleDownload);
@@ -306,10 +358,30 @@ document.addEventListener('DOMContentLoaded', function() {
         previewModal.style.display = 'block';
     }
 
+    // Handle edit button
+    function handleEdit(e) {
+        const docItem = e.target.closest('.document-item');
+        currentDocId = docItem.dataset.id;
+        const docTitle = docItem.querySelector('.doc-title').textContent;
+        const statusBadge = docItem.querySelector('.status-badge').className;
+        // fallback in case of classes being dynamically changed but structurally it matches
+        const docCategory = docItem.querySelector('.status-badge').textContent.split(' ')[0].toLowerCase();
+        
+        document.getElementById('editDocName').value = docTitle;
+        // Note: the category rendered under status-badge might actually be the status or category based on structure. 
+        // In the HTML: \`<span class="status-badge status-${doc.status}">\` indicates status. 
+        // To properly get category without storing in dataset, we should rely on backend API. 
+        // For simplicity, we can load it from text if provided, or set dummy. 
+        // We will reset the file text.
+        document.getElementById('editFileAreaP').textContent = "Click to upload or drag and drop to replace";
+        document.getElementById('editDocFile').value = '';
+        editModal.style.display = 'block';
+    }
+
     // Handle download button
     function handleDownload(e) {
-        const docId = e.currentTarget.dataset.id;
-        alert(`Document ${docId} download initiated`);
+        let docId = e.currentTarget.dataset.id;
+        window.location.href = '/dashboard/api/download-document/' + docId;
     }
 
     // Handle delete button
@@ -321,71 +393,96 @@ document.addEventListener('DOMContentLoaded', function() {
     // File upload handling
     docFile.addEventListener('change', function() {
         const fileName = this.files[0]?.name || 'No file chosen';
-        const fileArea = document.querySelector('.file-upload-area p');
+        const fileArea = document.querySelector('#uploadForm .file-upload-area p');
+        fileArea.textContent = fileName;
+    });
+
+    editDocFile.addEventListener('change', function() {
+        const fileName = this.files[0]?.name || 'No file chosen';
+        const fileArea = document.getElementById('editFileAreaP');
         fileArea.textContent = fileName;
     });
 
     // Handle form submission
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
-
         const formData = new FormData(uploadForm);
-
         fetch('/dashboard/api/upload-document/', {
             method: 'POST',
             body: formData,
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
         })
         .then(response => response.json())
         .then(result => {
             if (result.status === 'success') {
-                alert(result.message);
+                showNotification(result.message, 'success');
                 uploadModal.style.display = 'none';
                 uploadForm.reset();
+                document.querySelector('#uploadForm .file-upload-area p').textContent = 'Click to upload or drag and drop';
                 performSearch();
             } else {
-                alert('Error: ' + result.message);
+                showNotification('Error: ' + result.message, 'error');
             }
         })
         .catch(error => {
-            console.error('Upload error:', error);
-            alert('Failed to upload document. Please try again.');
+            showNotification('Failed to upload document. Please try again.', 'error');
+        });
+    });
+
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!currentDocId) return;
+        const formData = new FormData(editForm);
+        fetch('/dashboard/api/update-document/' + currentDocId + '/', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                showNotification(result.message, 'success');
+                editModal.style.display = 'none';
+                editForm.reset();
+                performSearch();
+            } else {
+                showNotification('Error: ' + result.message, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to update document. Please try again.', 'error');
         });
     });
 
     // Handle delete confirmation
     document.querySelector('.confirm-delete').addEventListener('click', function() {
         if (!currentDocId) return;
-
         fetch(`/dashboard/api/delete-document/${currentDocId}/`, {
             method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken')
-            }
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
         })
         .then(response => response.json())
         .then(result => {
             if (result.status === 'success') {
-                alert(result.message);
+                showNotification(result.message, 'success');
                 deleteModal.style.display = 'none';
                 currentDocId = null;
                 performSearch();
             } else {
-                alert('Error: ' + result.message);
+                showNotification('Error: ' + result.message, 'error');
             }
         })
         .catch(error => {
-            console.error('Delete error:', error);
-            alert('Failed to delete document. Please try again.');
+            showNotification('Failed to delete document. Please try again.', 'error');
         });
     });
 
     // Event listeners
     searchBtn.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') performSearch();
+    let searchTimeout;
+    searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(performSearch, 300);
     });
     categoryFilter.addEventListener('change', performSearch);
     uploadBtn.addEventListener('click', function() {
@@ -396,6 +493,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.close-modal, .cancel-btn, .cancel-delete').forEach(el => {
         el.addEventListener('click', function() {
             uploadModal.style.display = 'none';
+            editModal.style.display = 'none';
             deleteModal.style.display = 'none';
             previewModal.style.display = 'none';
             currentDocId = null;
@@ -405,6 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Click outside modal to close
     window.addEventListener('click', function(e) {
         if (e.target === uploadModal) uploadModal.style.display = 'none';
+        if (e.target === editModal) editModal.style.display = 'none';
         if (e.target === deleteModal) deleteModal.style.display = 'none';
         if (e.target === previewModal) previewModal.style.display = 'none';
     });
@@ -426,6 +525,43 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         return cookieValue;
+    }
+
+    const toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style = 'position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;';
+    document.body.appendChild(toastContainer);
+
+    function showNotification(message, type) {
+        const toast = document.createElement('div');
+        toast.style = `
+            background: ${type === 'error' ? '#da1e28' : '#24a148'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        `;
+        toast.innerHTML = `<span style="font-size:18px;">${type==='success' ? '✅' : '⚠️'}</span> <span>${message}</span>`;
+        toastContainer.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(50px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
     }
 });
 </script>

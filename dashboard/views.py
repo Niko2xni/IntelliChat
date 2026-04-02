@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
@@ -349,6 +349,56 @@ def delete_document(request, doc_id):
         return JsonResponse({'status': 'error', 'message': 'Document not found'}, status=404)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@user_passes_test(is_admin, login_url='login')
+@require_http_methods(["POST"])
+@csrf_exempt
+def update_document(request, doc_id):
+    """API endpoint to update an existing document."""
+    try:
+        doc = Document.objects.get(id=doc_id)
+        title = request.POST.get('title')
+        category = request.POST.get('category', doc.category)
+        file = request.FILES.get('file')
+
+        if title:
+            doc.title = title
+        doc.category = category
+
+        if file:
+            # Delete old file safely
+            if doc.file:
+                doc.file.delete(save=False)
+            doc.file = file
+            doc.file_type = file.name.split('.')[-1].upper()
+            doc.file_size = file.size
+
+        doc.save()
+        return JsonResponse({'status': 'success', 'message': 'Document updated successfully'})
+    except Document.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Document not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@user_passes_test(is_admin, login_url='login')
+@require_http_methods(["GET"])
+def download_document(request, doc_id):
+    """API endpoint to download a document."""
+    try:
+        doc = Document.objects.get(id=doc_id)
+        if not doc.file:
+            raise Http404("File not found.")
+        
+        # Increment download counter natively
+        doc.download_count += 1
+        doc.save(update_fields=['download_count'])
+        
+        response = FileResponse(doc.file, as_attachment=True, filename=doc.file.name.split('/')[-1])
+        return response
+    except Document.DoesNotExist:
+        raise Http404("Document not found.")
 
 
 def format_file_size(bytes_size):
