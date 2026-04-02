@@ -10,4 +10,7 @@ urlpatterns = [
     path('ask/', views.ask_gemini, name='ask_gemini'),
     path('send-otp/', views.send_otp, name='send_otp'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('send-password-otp/', views.send_password_change_otp, name='send_password_otp'),
+    path('verify-password-otp/', views.verify_password_change_otp, name='verify_password_otp'),
+    path('update-password/', views.update_password, name='update_password'),
 ]

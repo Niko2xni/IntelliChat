@@ -217,11 +217,40 @@ Log In
 </div>
 
 <div id="changePasswordModal" class="custom-modal">
-  <div class="modal-content-box">
+  <div class="modal-content-box" style="text-align: left;">
     <span class="modal-close-btn" onclick="closeModal('changePasswordModal')">&times;</span>
-    <h3 style="margin-bottom:15px; color:#333;">Change Password</h3>
-    <p style="color:#666; line-height:1.5;">Password change functionality will be implemented by the backend team.</p>
-    <button class="custom-modal-btn" onclick="closeModal('changePasswordModal')">Close</button>
+    <h3 style="margin-bottom:15px; color:#333; text-align: center;">Change Password</h3>
+    
+    <div id="pwdStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">We will send a verification code to your email to verify your identity.</p>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="sendPwdOtp(this)">Send Verification Code</button>
+        <div id="pwdStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="pwdStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter the 6-digit code sent to your email.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="pwdOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="verifyPwdOtp(this)">Verify Code</button>
+        <div id="pwdStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+
+    <div id="pwdStep3" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter your new password. It must be at least 8 characters long.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdNewInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">New Password</label>
+            <input type="password" id="pwdNewInput" placeholder="Enter new password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdConfirmInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Confirm Password</label>
+            <input type="password" id="pwdConfirmInput" placeholder="Confirm new password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="updatePassword(this)">Update Password</button>
+        <div id="pwdStep3Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="pwdStep3Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Password changed successfully!</div>
+    </div>
   </div>
 </div>
 
@@ -229,12 +258,31 @@ Log In
 function openModal(modalId) {
     document.getElementById(modalId).style.display = 'flex';
 }
+function resetPwdState() {
+    if(document.getElementById("pwdStep3Success")) document.getElementById("pwdStep3Success").style.display = "none";
+    if(document.getElementById("pwdStep3Error")) document.getElementById("pwdStep3Error").style.display = "none";
+    if(document.getElementById("pwdStep2Error")) document.getElementById("pwdStep2Error").style.display = "none";
+    if(document.getElementById("pwdStep1Error")) document.getElementById("pwdStep1Error").style.display = "none";
+    if(document.getElementById("pwdNewInput")) {
+        document.getElementById("pwdNewInput").value = "";
+        document.getElementById("pwdConfirmInput").value = "";
+        document.getElementById("pwdOtpInput").value = "";
+    }
+    if(document.getElementById("pwdStep3")) {
+        document.getElementById("pwdStep3").style.display = "none";
+        document.getElementById("pwdStep2").style.display = "none";
+        document.getElementById("pwdStep1").style.display = "block";
+    }
+}
+
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
+    if (modalId === 'changePasswordModal') resetPwdState();
 }
 window.addEventListener('click', function(event) {
     if (event.target.classList.contains('custom-modal')) {
         event.target.style.display = 'none';
+        resetPwdState();
     }
 });
 
@@ -314,6 +362,141 @@ reader.readAsDataURL(file);
 }
 
 });
+
+// Password Change Flow Functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function sendPwdOtp(btn) {
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("pwdStep1Error").style.display = "none";
+    
+    fetch("{% url 'send_password_otp' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("pwdStep1").style.display = "none";
+            document.getElementById("pwdStep2").style.display = "block";
+        } else {
+            document.getElementById("pwdStep1Error").innerText = data.error || "Failed to send OTP.";
+            document.getElementById("pwdStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("pwdStep1Error").innerText = "Network error occurred.";
+        document.getElementById("pwdStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function verifyPwdOtp(btn) {
+    const otp = document.getElementById("pwdOtpInput").value.trim();
+    if(!otp) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Verifying...";
+    document.getElementById("pwdStep2Error").style.display = "none";
+    
+    fetch("{% url 'verify_password_otp' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.valid) {
+            document.getElementById("pwdStep2").style.display = "none";
+            document.getElementById("pwdStep3").style.display = "block";
+        } else {
+            document.getElementById("pwdStep2Error").innerText = data.error || "Invalid OTP.";
+            document.getElementById("pwdStep2Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("pwdStep2Error").innerText = "Network error occurred.";
+        document.getElementById("pwdStep2Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Verify Code";
+    });
+}
+
+function updatePassword(btn) {
+    const pwd = document.getElementById("pwdNewInput").value;
+    const confirm = document.getElementById("pwdConfirmInput").value;
+    const errorDiv = document.getElementById("pwdStep3Error");
+    errorDiv.style.display = "none";
+    
+    if(pwd.length < 8) {
+        errorDiv.innerText = "Password must be at least 8 characters.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    if(pwd !== confirm) {
+        errorDiv.innerText = "Passwords do not match.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerText = "Updating...";
+    
+    fetch("{% url 'update_password' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd, confirmPassword: confirm})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("pwdStep3Success").style.display = "block";
+            setTimeout(() => {
+                closeModal('changePasswordModal');
+            }, 2000);
+        } else {
+            errorDiv.innerText = data.error || "Failed to update password.";
+            errorDiv.style.display = "block";
+        }
+    })
+    .catch(err => {
+        errorDiv.innerText = "Network error occurred.";
+        errorDiv.style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Update Password";
+    });
+}
 
 </script>
 

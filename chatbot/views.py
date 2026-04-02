@@ -4,7 +4,7 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.conf import settings
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from google import genai
 from .models import Student
 from django.core.mail import send_mail
@@ -204,3 +204,91 @@ def send_otp(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False}, status=400)
+
+def send_password_change_otp(request):
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            email = request.user.email
+            if not email:
+                return JsonResponse({'success': False, 'error': 'User has no email associated.'})
+
+            otp = "".join(str(secrets.randbelow(10)) for _ in range(6))
+            
+            request.session['password_change_otp'] = otp
+            request.session['password_change_otp_timestamp'] = time.time()
+            request.session['password_change_otp_verified'] = False
+            
+            subject = "Your Password Change Verification Code"
+            message = f"Hello! Your verification code to change your password is: {otp}\n\nThis code will expire in 10 minutes. If you did not request a password change, please ignore this email."
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            send_mail(subject, message, from_email, [email], fail_silently=False)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def verify_password_change_otp(request):
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return JsonResponse({'valid': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            data = json.loads(request.body)
+            user_otp = data.get('otp')
+            session_otp = request.session.get('password_change_otp')
+            otp_timestamp = request.session.get('password_change_otp_timestamp', 0)
+            
+            if time.time() - otp_timestamp > 600:  # 10 minutes validation
+                return JsonResponse({'valid': False, 'error': 'OTP has expired. Please request a new one.'})
+            
+            if session_otp and str(user_otp) == str(session_otp):
+                request.session['password_change_otp_verified'] = True
+                return JsonResponse({'valid': True})
+                
+            request.session['password_change_otp_verified'] = False
+            return JsonResponse({'valid': False, 'error': 'Invalid verification code.'})
+        except Exception:
+            return JsonResponse({'valid': False, 'error': 'Invalid request.'}, status=400)
+    return JsonResponse({'valid': False, 'error': 'Invalid request.'}, status=400)
+
+def update_password(request):
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        if not request.session.get('password_change_otp_verified', False):
+            return JsonResponse({'success': False, 'error': 'Please verify your email via OTP first.'})
+            
+        try:
+            data = json.loads(request.body)
+            password = data.get('password', '').strip()
+            confirm_password = data.get('confirmPassword', '').strip()
+            
+            if not password or len(password) < 8:
+                return JsonResponse({'success': False, 'error': 'Password must be at least 8 characters long.'})
+                
+            if password != confirm_password:
+                return JsonResponse({'success': False, 'error': 'Passwords do not match.'})
+                
+            # Update the user's password
+            request.user.set_password(password)
+            request.user.save()
+            
+            # Keep the user logged in
+            update_session_auth_hash(request, request.user)
+            
+            # Clear the OTP session variables
+            request.session.pop('password_change_otp', None)
+            request.session.pop('password_change_otp_timestamp', None)
+            request.session.pop('password_change_otp_verified', None)
+            request.session.modified = True
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
