@@ -32,7 +32,11 @@
 </a>
 
 <a href="{% url 'chatbot_home' %}" class="header-icon profile-icon">
+{% if user.is_authenticated and user.profile_picture %}
+<img src="{{ user.profile_picture.url }}">
+{% else %}
 <img src="{% static 'images/profile.png' %}">
+{% endif %}
 </a>
 
 </div>
@@ -62,7 +66,11 @@
 <div class="profile-header">
 
 <div class="profile-image">
+{% if user.is_authenticated and user.profile_picture %}
+<img id="profilePreview" src="{{ user.profile_picture.url }}">
+{% else %}
 <img id="profilePreview" src="{% static 'images/profile.png' %}">
+{% endif %}
 </div>
 
 <div class="profile-info">
@@ -406,15 +414,55 @@ imageUpload.addEventListener("change", function(){
 const file = this.files[0];
 
 if(file){
+    if (file.size > 4 * 1024 * 1024) {
+        alert("File size exceeds 4MB. Please choose a smaller image.");
+        this.value = ""; // Clear selection
+        return;
+    }
 
-const reader = new FileReader();
+    const reader = new FileReader();
 
-reader.onload = function(e){
-profilePreview.src = e.target.result;
-}
+    reader.onload = function(e){
+        profilePreview.src = e.target.result;
+    }
 
-reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
 
+    const formData = new FormData();
+    formData.append("profile_picture", file);
+    
+    // Change button to indicate uploading
+    const uploadBtn = document.querySelector('.upload-btn');
+    if(uploadBtn) {
+        uploadBtn.disabled = true;
+        uploadBtn.innerText = "Uploading...";
+    }
+
+    fetch("{% url 'upload_profile_picture' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            const navIcon = document.querySelector('.profile-icon img');
+            if(navIcon) navIcon.src = data.image_url;
+        } else {
+            alert(data.error || "Failed to upload image.");
+        }
+    })
+    .catch(err => {
+        alert("Network error occurred during upload.");
+    })
+    .finally(() => {
+        if(uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerText = "Upload Image";
+        }
+    });
 }
 
 });

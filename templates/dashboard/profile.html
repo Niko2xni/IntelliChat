@@ -238,8 +238,13 @@
         <!-- Profile Top -->
         <div class="admin-profile-top">
             <div class="admin-avatar">
+                {% if user.is_authenticated and user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" alt="Admin Avatar"
+                     onerror="this.style.display='none'; this.parentElement.textContent='👤';">
+                {% else %}
                 <img src="{% static 'images/profile.png' %}" alt="Admin Avatar"
                      onerror="this.style.display='none'; this.parentElement.textContent='👤';">
+                {% endif %}
             </div>
             <div class="admin-details">
                 <h3>{{ user.first_name }} {{ user.last_name }}</h3>

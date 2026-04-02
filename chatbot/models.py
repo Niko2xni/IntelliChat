@@ -23,6 +23,8 @@ class Student(AbstractUser):
         help_text='Must be a TIP email (@tip.edu.ph)',
     )
 
+    profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+
     # Use email as the login field
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_name', 'student_number']

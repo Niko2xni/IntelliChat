@@ -360,3 +360,37 @@ def confirm_delete_account(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def upload_profile_picture(request):
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        profile_picture = request.FILES.get('profile_picture')
+        if not profile_picture:
+            return JsonResponse({'success': False, 'error': 'No image file provided.'})
+            
+        # 4MB size restriction
+        if profile_picture.size > 4 * 1024 * 1024:
+            return JsonResponse({'success': False, 'error': 'File size exceeds 4MB limit.'})
+            
+        # Optionally validate content-type
+        if not profile_picture.content_type.startswith('image/'):
+            return JsonResponse({'success': False, 'error': 'File must be an image.'})
+            
+        try:
+            # Delete old picture if needed, or simply overwrite
+            if request.user.profile_picture:
+                request.user.profile_picture.delete(save=False)
+                
+            request.user.profile_picture = profile_picture
+            request.user.save()
+            
+            return JsonResponse({
+                'success': True,
+                'image_url': request.user.profile_picture.url
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
