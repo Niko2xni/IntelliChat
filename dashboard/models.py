@@ -59,6 +59,9 @@ class FAQ(models.Model):
         ('billing', 'Billing'),
         ('account', 'Account'),
         ('features', 'Features'),
+        ('security', 'Security'),
+        ('integrations', 'Integrations'),
+        ('support', 'Support'),
     ], default='general')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -113,6 +113,9 @@
                     <option value="billing">Billing</option>
                     <option value="account">Account</option>
                     <option value="features">Features</option>
+                    <option value="security">Security</option>
+                    <option value="integrations">Integrations</option>
+                    <option value="support">Support</option>
                 </select>
             </div>
 
@@ -337,8 +340,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event listeners
     searchBtn.addEventListener('click', performSearch);
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') performSearch();
+    
+    let searchTimeout;
+    searchInput.addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(performSearch, 300);
     });
 
     categoryFilter.addEventListener('change', performSearch);
@@ -389,9 +395,41 @@ document.addEventListener('DOMContentLoaded', function() {
         return cookieValue;
     }
 
+    const toastContainer = document.createElement('div');
+    toastContainer.id = 'toast-container';
+    toastContainer.style = 'position:fixed; bottom:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:10px;';
+    document.body.appendChild(toastContainer);
+
     function showNotification(message, type) {
-        // Simple notification - you can enhance this
-        alert(message);
+        const toast = document.createElement('div');
+        toast.style = `
+            background: ${type === 'error' ? '#da1e28' : '#24a148'};
+            color: white;
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        `;
+        toast.innerHTML = `<span style="font-size:18px;">${type==='success' ? '✅' : '⚠️'}</span> <span>${message}</span>`;
+        toastContainer.appendChild(toast);
+        
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(50px)';
+            setTimeout(() => toast.remove(), 300);
+        }, 3500);
     }
 });
 </script>
