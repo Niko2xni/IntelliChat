@@ -21,7 +21,7 @@ def login_view(request):
     email_value = ''
 
     if request.method == 'POST':
-        email = request.POST.get('email', '').strip()
+        email = request.POST.get('email', '').strip().lower()
         password = request.POST.get('password', '').strip()
         email_value = email
 
