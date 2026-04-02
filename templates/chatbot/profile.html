@@ -123,7 +123,7 @@ General
 
 <div class="profile-actions" style="align-items: center; gap: 20px;">
 {% if user.is_authenticated %}
-<button class="delete-btn">
+<button class="delete-btn" onclick="openModal('deleteAccountModal')">
 Delete Account
 </button>
 
@@ -254,6 +254,40 @@ Log In
   </div>
 </div>
 
+<div id="deleteAccountModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('deleteAccountModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#d9534f; text-align: center;">Delete Account</h3>
+    
+    <div id="delStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Deleting your account is permanent. Please enter your current password to proceed.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="delPasswordInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="delPasswordInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px; background: #d9534f; color: white;" onclick="initDeleteAccount(this)">Send Verification Code</button>
+        <div id="delStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="delStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Check your email for the 6-digit confirmation code.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="delOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="delOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        
+        <div style="display: flex; align-items: start; margin-bottom: 20px; gap: 8px;">
+            <input type="checkbox" id="delConfirmCheckbox" style="margin-top: 3px;">
+            <label for="delConfirmCheckbox" style="font-size: 13px; color: #555; line-height: 1.4;">I understand that deleting my account is permanent and cannot be undone.</label>
+        </div>
+
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px; background: #d9534f; color: white;" onclick="confirmDeleteAccount(this)">Permanently Delete Account</button>
+        <div id="delStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="delStep2Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Account deleted. Redirecting...</div>
+    </div>
+  </div>
+</div>
+
 <script>
 function openModal(modalId) {
     document.getElementById(modalId).style.display = 'flex';
@@ -275,14 +309,31 @@ function resetPwdState() {
     }
 }
 
+function resetDelState() {
+    if(document.getElementById("delStep2Success")) document.getElementById("delStep2Success").style.display = "none";
+    if(document.getElementById("delStep2Error")) document.getElementById("delStep2Error").style.display = "none";
+    if(document.getElementById("delStep1Error")) document.getElementById("delStep1Error").style.display = "none";
+    if(document.getElementById("delPasswordInput")) {
+        document.getElementById("delPasswordInput").value = "";
+        document.getElementById("delOtpInput").value = "";
+        document.getElementById("delConfirmCheckbox").checked = false;
+    }
+    if(document.getElementById("delStep2")) {
+        document.getElementById("delStep2").style.display = "none";
+        document.getElementById("delStep1").style.display = "block";
+    }
+}
+
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
     if (modalId === 'changePasswordModal') resetPwdState();
+    if (modalId === 'deleteAccountModal') resetDelState();
 }
 window.addEventListener('click', function(event) {
     if (event.target.classList.contains('custom-modal')) {
         event.target.style.display = 'none';
         resetPwdState();
+        resetDelState();
     }
 });
 
@@ -497,6 +548,90 @@ function updatePassword(btn) {
         btn.innerText = "Update Password";
     });
 }
+
+// Delete Account Flow Functions
+function initDeleteAccount(btn) {
+    const pwd = document.getElementById("delPasswordInput").value;
+    if(!pwd) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("delStep1Error").style.display = "none";
+    
+    fetch("{% url 'init_delete_account' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("delStep1").style.display = "none";
+            document.getElementById("delStep2").style.display = "block";
+        } else {
+            document.getElementById("delStep1Error").innerText = data.error || "Failed to start deletion.";
+            document.getElementById("delStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("delStep1Error").innerText = "Network error occurred.";
+        document.getElementById("delStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function confirmDeleteAccount(btn) {
+    const otp = document.getElementById("delOtpInput").value.trim();
+    const checkbox = document.getElementById("delConfirmCheckbox").checked;
+    const errorDiv = document.getElementById("delStep2Error");
+    errorDiv.style.display = "none";
+    
+    if(!otp) return;
+    if(!checkbox) {
+        errorDiv.innerText = "You must acknowledge that this is permanent.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerText = "Deleting...";
+    
+    fetch("{% url 'confirm_delete_account' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("delStep2Success").style.display = "block";
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 1000);
+        } else {
+            errorDiv.innerText = data.error || "Invalid OTP.";
+            errorDiv.style.display = "block";
+            btn.disabled = false;
+            btn.innerText = "Permanently Delete Account";
+        }
+    })
+    .catch(err => {
+        errorDiv.innerText = "Network error occurred.";
+        errorDiv.style.display = "block";
+        btn.disabled = false;
+        btn.innerText = "Permanently Delete Account";
+    });
+}
+
 
 </script>
 

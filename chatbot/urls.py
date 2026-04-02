@@ -13,4 +13,6 @@ urlpatterns = [
     path('send-password-otp/', views.send_password_change_otp, name='send_password_otp'),
     path('verify-password-otp/', views.verify_password_change_otp, name='verify_password_otp'),
     path('update-password/', views.update_password, name='update_password'),
+    path('init-delete-account/', views.init_delete_account, name='init_delete_account'),
+    path('confirm-delete-account/', views.confirm_delete_account, name='confirm_delete_account'),
 ]

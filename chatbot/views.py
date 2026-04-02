@@ -292,3 +292,65 @@ def update_password(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def init_delete_account(request):
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            data = json.loads(request.body)
+            password = data.get('password', '').strip()
+            
+            if not request.user.check_password(password):
+                return JsonResponse({'success': False, 'error': 'Incorrect password.'})
+                
+            email = request.user.email
+            if not email:
+                return JsonResponse({'success': False, 'error': 'User has no email associated.'})
+
+            otp = "".join(str(secrets.randbelow(10)) for _ in range(6))
+            
+            request.session['delete_account_otp'] = otp
+            request.session['delete_account_otp_timestamp'] = time.time()
+            
+            subject = "Account Deletion Verification Code"
+            message = f"Hello! Your verification code to irrevocably delete your account is: {otp}\n\nThis code will expire in 10 minutes. If you did not request this, please change your password immediately."
+            from_email = settings.DEFAULT_FROM_EMAIL
+            
+            send_mail(subject, message, from_email, [email], fail_silently=False)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def confirm_delete_account(request):
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            data = json.loads(request.body)
+            user_otp = data.get('otp')
+            session_otp = request.session.get('delete_account_otp')
+            otp_timestamp = request.session.get('delete_account_otp_timestamp', 0)
+            
+            if time.time() - otp_timestamp > 600:
+                return JsonResponse({'success': False, 'error': 'OTP has expired. Please start over.'})
+            
+            if session_otp and str(user_otp) == str(session_otp):
+                user = request.user
+                logout(request)
+                user.delete()
+                # Clear session keys manually just in case, though logout handles it
+                if 'delete_account_otp' in request.session:
+                    del request.session['delete_account_otp']
+                if 'delete_account_otp_timestamp' in request.session:
+                    del request.session['delete_account_otp_timestamp']
+                return JsonResponse({'success': True})
+                
+            return JsonResponse({'success': False, 'error': 'Invalid verification code.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
