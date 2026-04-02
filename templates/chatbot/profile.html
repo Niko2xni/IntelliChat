@@ -31,7 +31,7 @@
 <span class="notif-badge"></span>
 </a>
 
-<a href="{% url 'profile' %}" class="header-icon profile-icon">
+<a href="{% url 'chatbot_home' %}" class="header-icon profile-icon">
 <img src="{% static 'images/profile.png' %}">
 </a>
 
@@ -104,7 +104,7 @@ General
 <i class="fas fa-question-circle"></i>
 </div>
 
-<a href="#" class="small-link">Contact admin</a>
+<a href="#" class="small-link" onclick="openModal('contactAdminModal')">Contact admin</a>
 
 </div>
 
@@ -114,7 +114,7 @@ General
 <label>Password</label>
 
 <div class="settings-input">********</div>
-<a href="#" class="small-link">Change password</a>
+<a href="#" class="small-link" onclick="openModal('changePasswordModal')">Change password</a>
 
 </div>
 
@@ -123,13 +123,13 @@ General
 </div>
 {% endif %}
 
-<div class="profile-actions">
+<div class="profile-actions" style="align-items: center; gap: 20px;">
 {% if user.is_authenticated %}
 <button class="delete-btn">
 Delete Account
 </button>
 
-<form method="POST" action="{% url 'logout' %}" style="display:inline;">
+<form method="POST" action="{% url 'logout' %}" style="margin: 0; padding: 0;">
 {% csrf_token %}
 <button type="submit" class="logout-btn">
 Logout
@@ -150,6 +150,114 @@ Log In
 
 </div>
 
+<!-- Custom Modals Structure -->
+<style>
+.custom-modal {
+    display: none; 
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+.modal-content-box {
+    background-color: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    position: relative;
+    font-family: Arial, sans-serif;
+}
+.modal-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+}
+.modal-close-btn:hover { color: #000; }
+.custom-modal-btn {
+    background: linear-gradient(to bottom, #ffd35c, #f0a500);
+    border: none;
+    padding: 10px 25px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 15px;
+    color: #333;
+}
+</style>
+
+<div id="contactAdminModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('contactAdminModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#333; text-align: center;">Contact Admin</h3>
+    <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">To request for a "Student Leader" account type, please enter the required details. An admin will verify your request after in a while.</p>
+    
+    <form id="studentLeaderRequestForm" style="display: flex; flex-direction: column; gap: 12px; text-align: left;">
+        <div style="display: flex; flex-direction: column;">
+            <label for="slStudentNumber" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Student number</label>
+            <input type="text" id="slStudentNumber" placeholder="Enter student number" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+            <label for="slPosition" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Position</label>
+            <input type="text" id="slPosition" placeholder="Enter position" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column;">
+            <label for="slOrg" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">What org</label>
+            <input type="text" id="slOrg" placeholder="Enter organization name" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="submitRoleRequest()">Send request</button>
+    </form>
+  </div>
+</div>
+
+<div id="changePasswordModal" class="custom-modal">
+  <div class="modal-content-box">
+    <span class="modal-close-btn" onclick="closeModal('changePasswordModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#333;">Change Password</h3>
+    <p style="color:#666; line-height:1.5;">Password change functionality will be implemented by the backend team.</p>
+    <button class="custom-modal-btn" onclick="closeModal('changePasswordModal')">Close</button>
+  </div>
+</div>
+
+<script>
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'flex';
+}
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+window.addEventListener('click', function(event) {
+    if (event.target.classList.contains('custom-modal')) {
+        event.target.style.display = 'none';
+    }
+});
+
+function submitRoleRequest() {
+    const form = document.getElementById("studentLeaderRequestForm");
+    if(form.reportValidity()) {
+        const btn = form.querySelector("button");
+        const originalText = btn.innerText;
+        btn.innerText = "Request Sent!";
+        btn.disabled = true;
+        
+        // Mock backend processing delay
+        setTimeout(() => {
+            closeModal('contactAdminModal');
+            btn.innerText = originalText;
+            btn.disabled = false;
+            form.reset();
+        }, 1500);
+    }
+}
+</script>
 
 <script>
 

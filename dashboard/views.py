@@ -358,3 +358,17 @@ def format_file_size(bytes_size):
             return f"{bytes_size:.1f} {unit}"
         bytes_size /= 1024.0
     return f"{bytes_size:.1f} TB"
+
+@user_passes_test(is_admin, login_url='login')
+def logging_monitoring(request):
+    """Logging and Monitoring page."""
+    # Dummy mock data for now, acting as frontend showcase
+    logs = [
+        {"timestamp": "2026-04-02 23:45:00", "action": "Approved Student Leader request", "user": "admin", "details": "Approved role for student 2026123"},
+        {"timestamp": "2026-04-02 22:30:15", "action": "Changed Password", "user": "user@tip.edu.ph", "details": "User changed their password via reset link"},
+        {"timestamp": "2026-04-01 14:10:00", "action": "Deleted Document", "user": "admin", "details": "Deleted 'Old_Manual.pdf' from Documents"},
+        {"timestamp": "2026-03-30 09:12:33", "action": "Uploaded Document", "user": "admin", "details": "Uploaded 'Syllabus.docx' to Documents"},
+        {"timestamp": "2026-03-29 16:50:00", "action": "Declined Student Leader request", "user": "admin", "details": "Declined role for student 2024567 (Invalid organization)"}
+    ]
+    return render(request, 'dashboard/logging.html', {'logs': logs})
+

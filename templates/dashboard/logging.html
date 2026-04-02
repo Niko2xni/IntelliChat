@@ -1,0 +1,147 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Logging & Monitoring - IntelliChat Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+.logging-container {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+.logging-header {
+    margin-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 15px;
+}
+.logging-header h2 {
+    color: #333;
+    font-size: 24px;
+}
+.logging-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.logging-table th, .logging-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+.logging-table th {
+    background-color: #fca311;
+    color: white;
+    font-weight: 600;
+}
+.logging-table tr:hover {
+    background-color: #f9f9f9;
+}
+.action-badge {
+    background: #e9ecef;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #495057;
+}
+.action-approved { background: #d4edda; color: #155724; }
+.action-declined { background: #f8d7da; color: #721c24; }
+.action-uploaded { background: #cce5ff; color: #004085; }
+.action-deleted { background: #fff3cd; color: #856404; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="logging-container">
+    <div class="logging-header">
+        <h2>System Logs & Monitoring</h2>
+        <p style="color: #666; margin-top: 5px;">View history of actions including Student Leader requests, credential changes, and document management.</p>
+    </div>
+    
+    <div class="logging-controls" style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <input type="text" id="logSearch" placeholder="Search logs (action, user, details)..." style="flex: 1; padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;" onfocus="this.style.borderColor='#fca311'" onblur="this.style.borderColor='#e0e0e0'">
+        <select id="logFilter" style="padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; background: white; outline: none; cursor: pointer;">
+            <option value="all">All Actions</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+            <option value="uploaded">Uploaded</option>
+            <option value="deleted">Deleted</option>
+            <option value="changed">Changed Password</option>
+        </select>
+    </div>
+
+    <table class="logging-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>User / Triggered By</th>
+                <th>Details</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="color: #666; font-size: 14px;">{{ log.timestamp }}</td>
+                <td>
+                    <span class="action-badge 
+                        {% if 'Approved' in log.action %}action-approved{% endif %}
+                        {% if 'Declined' in log.action %}action-declined{% endif %}
+                        {% if 'Uploaded' in log.action %}action-uploaded{% endif %}
+                        {% if 'Deleted' in log.action %}action-deleted{% endif %}
+                    ">
+                        {{ log.action }}
+                    </span>
+                </td>
+                <td style="font-weight: 500;">{{ log.user }}</td>
+                <td style="color: #555;">{{ log.details }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Make sidebar link active
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => item.classList.remove('active'));
+        const currentLink = document.querySelector('a[href*="logging"]');
+        if(currentLink) currentLink.classList.add('active');
+
+        // Search and Filter Logic
+        const searchInput = document.getElementById('logSearch');
+        const filterSelect = document.getElementById('logFilter');
+        const rows = document.querySelectorAll('.logging-table tbody tr');
+
+        function filterLogs() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filterValue = filterSelect.value.toLowerCase();
+
+            rows.forEach(row => {
+                const textContent = row.textContent.toLowerCase();
+                const actionBadge = row.querySelector('.action-badge').textContent.toLowerCase();
+                
+                const matchesSearch = textContent.includes(searchTerm);
+                let matchesFilter = true;
+                
+                if (filterValue !== 'all') {
+                    matchesFilter = actionBadge.includes(filterValue);
+                }
+
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        if (searchInput && filterSelect) {
+            searchInput.addEventListener('input', filterLogs);
+            filterSelect.addEventListener('change', filterLogs);
+        }
+    });
+</script>
+{% endblock %}

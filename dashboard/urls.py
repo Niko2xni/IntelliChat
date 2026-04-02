@@ -18,4 +18,5 @@ urlpatterns = [
     path('api/search-documents/', views.search_documents, name='search_documents'),
     path('api/upload-document/', views.upload_document, name='upload_document'),
     path('api/delete-document/<int:doc_id>/', views.delete_document, name='delete_document'),
+    path('logging/', views.logging_monitoring, name='logging'),
 ]
