@@ -178,8 +178,8 @@ def send_otp(request):
             email = data.get('email', '').strip().lower()
             student_number = data.get('studentNumber', '').strip()
 
-            if not email.endswith('@tip.edu.ph'):
-                return JsonResponse({'success': False, 'error': 'Must be a TIP email.'})
+            if not (email.endswith('@tip.edu.ph') or email.endswith('@gmail.com')):
+                return JsonResponse({'success': False, 'error': 'Must be a TIP or Gmail email.'})
                 
             if Student.objects.filter(email=email).exists():
                 return JsonResponse({'success': False, 'error': 'This email is already registered.'})
@@ -393,4 +393,76 @@ def upload_profile_picture(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def init_change_email(request):
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            data = json.loads(request.body)
+            password = data.get('password', '').strip()
+            new_email = data.get('new_email', '').strip()
+            
+            if not request.user.check_password(password):
+                return JsonResponse({'success': False, 'error': 'Incorrect password.'})
+                
+            if not (new_email.endswith('@tip.edu.ph') or new_email.endswith('@gmail.com')):
+                return JsonResponse({'success': False, 'error': 'Must be a TIP or Gmail email.'})
+                
+            from chatbot.models import Student
+            if Student.objects.filter(email=new_email).exists():
+                return JsonResponse({'success': False, 'error': 'This email is already in use.'})
+                
+            otp = "".join(str(secrets.randbelow(10)) for _ in range(6))
+            request.session['email_change_otp'] = otp
+            request.session['email_change_otp_timestamp'] = time.time()
+            request.session['email_change_new'] = new_email
+            
+            subject = "Your Email Change Verification Code"
+            message = f"Your verification code to change your email is: {otp}\n\nThis code will expire in 10 minutes."
+            from_email = settings.DEFAULT_FROM_EMAIL
+            send_mail(subject, message, from_email, [new_email], fail_silently=False)
+            
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)
+
+def confirm_change_email(request):
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+            
+        try:
+            data = json.loads(request.body)
+            otp_entered = data.get('otp', '').strip()
+            
+            stored_otp = request.session.get('email_change_otp')
+            timestamp = request.session.get('email_change_otp_timestamp')
+            new_email = request.session.get('email_change_new')
+            
+            if not stored_otp or not timestamp or not new_email:
+                return JsonResponse({'success': False, 'error': 'No active verification session.'})
+                
+            if time.time() - timestamp > 600:
+                return JsonResponse({'success': False, 'error': 'Verification code expired.'})
+                
+            if stored_otp == otp_entered:
+                request.user.email = new_email
+                request.user.save()
+                
+                # Clear session
+                del request.session['email_change_otp']
+                del request.session['email_change_otp_timestamp']
+                del request.session['email_change_new']
+                
+                return JsonResponse({'success': True})
+                
+            return JsonResponse({'success': False, 'error': 'Invalid verification code.'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
     return JsonResponse({'success': False, 'error': 'Invalid request.'}, status=400)

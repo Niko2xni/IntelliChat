@@ -20,7 +20,7 @@ class Student(AbstractUser):
 
     email = models.EmailField(
         unique=True,
-        help_text='Must be a TIP email (@tip.edu.ph)',
+        help_text='Must be a TIP (@tip.edu.ph) or Gmail (@gmail.com) email',
     )
 
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)

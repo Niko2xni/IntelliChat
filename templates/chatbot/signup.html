@@ -80,17 +80,17 @@
 
 <div class="form-group" style="flex: 1;">
 
-<label for="email">TIP e-mail</label>
+<label for="email">Email</label>
 
 <div class="input-wrapper {% if errors.email %}input-error{% endif %}">
 <i class="fas fa-envelope"></i>
 <input type="email"
        id="email"
        name="email"
-       placeholder="TIP e-mail"
+       placeholder="Enter your email"
        value="{{ form_data.email }}"
-       pattern="^[a-zA-Z0-9._%+-]+@tip\.edu\.ph$"
-       title="Please use a TIP email"
+       pattern="^[a-zA-Z0-9._%+-]+@(tip\.edu\.ph|gmail\.com)$"
+       title="Please use a TIP or Gmail email"
        required>
 </div>
 {% if errors.email %}
@@ -270,8 +270,8 @@ signupForm.addEventListener("submit", function (e) {
     }
 
     const email = emailField.value.trim().toLowerCase();
-    if (!email.endsWith("@tip.edu.ph")) {
-        emailField.setCustomValidity("Please use a valid @tip.edu.ph email address.");
+    if (!email.endsWith("@tip.edu.ph") && !email.endsWith("@gmail.com")) {
+        emailField.setCustomValidity("Please use a valid @tip.edu.ph or @gmail.com email address.");
         emailField.reportValidity();
         return;
     }

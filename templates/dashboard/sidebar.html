@@ -36,7 +36,11 @@
             </li>
             <li>
                 <a href="{% url 'dashboard:profile' %}" class="nav-item">
+                    {% if user.is_authenticated and user.profile_picture %}
+                    <img src="{{ user.profile_picture.url }}" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 15px;">
+                    {% else %}
                     <span class="icon">👤</span>
+                    {% endif %}
                     <span class="label">Profile</span>
                 </a>
             </li>

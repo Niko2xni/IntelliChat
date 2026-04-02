@@ -4,295 +4,693 @@
 {% block title %}Admin Profile - IntelliChat{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
 <style>
-/* Admin Profile Page Styles */
+/* Dashboard Constraint Override */
 .admin-profile-container {
     max-width: 900px;
     margin: 0 auto;
-}
-
-.admin-profile-header {
-    margin-bottom: 30px;
-}
-
-.admin-profile-header h2 {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin-bottom: 8px;
-}
-
-.admin-profile-header .subtitle {
-    color: var(--text-light);
-    font-size: 16px;
-}
-
-/* Profile Card */
-.admin-profile-card {
-    background-color: var(--bg-white);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border-color);
-    padding: 40px;
-}
-
-/* Profile Header Section */
-.admin-profile-top {
-    display: flex;
-    align-items: center;
-    gap: 30px;
-    margin-bottom: 35px;
-    padding-bottom: 30px;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.admin-avatar {
-    width: 110px;
-    height: 110px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 48px;
-    color: white;
-    flex-shrink: 0;
-    box-shadow: 0 4px 12px rgba(255, 165, 0, 0.3);
-}
-
-.admin-avatar img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    object-fit: cover;
-}
-
-.admin-details h3 {
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin-bottom: 6px;
-}
-
-.admin-details .admin-email {
-    font-size: 15px;
-    color: var(--text-light);
-    margin-bottom: 10px;
-}
-
-.admin-role-badge {
-    display: inline-block;
-    padding: 4px 14px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    background-color: rgba(255, 165, 0, 0.15);
-    color: var(--primary-color);
-    border: 1px solid rgba(255, 165, 0, 0.3);
-}
-
-/* Settings Section */
-.admin-settings-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin-bottom: 16px;
-}
-
-.admin-settings-note {
-    background-color: var(--bg-light);
-    padding: 14px 18px;
-    border-radius: 10px;
-    font-size: 14px;
-    color: var(--text-light);
-    margin-bottom: 28px;
-    border-left: 4px solid var(--primary-color);
-}
-
-.admin-settings-note strong {
-    color: var(--text-dark);
-}
-
-.admin-settings-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-bottom: 20px;
-}
-
-.admin-setting-item label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dark);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-}
-
-.admin-setting-value {
-    background-color: var(--bg-light);
-    padding: 14px 18px;
-    border-radius: 10px;
-    font-size: 14px;
-    color: var(--text-dark);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border: 1px solid var(--border-color);
-}
-
-.admin-setting-value .icon {
-    font-size: 16px;
-    color: var(--text-lighter);
-}
-
-.admin-setting-link {
-    display: inline-block;
-    margin-top: 8px;
-    font-size: 12px;
-    color: var(--primary-color);
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.admin-setting-link:hover {
-    color: var(--primary-dark);
-    text-decoration: underline;
-}
-
-/* Actions */
-.admin-profile-actions {
-    margin-top: 40px;
     padding-top: 30px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
+}
+/* Ensure the inner profile card styles match correctly */
+.profile-card {
+    margin-top: 0;
+}
+</style>
+<style>
+/* Modals Structure */
+.custom-modal {
+    display: none; 
+    position: fixed;
+    z-index: 2000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
     justify-content: center;
-    gap: 20px;
 }
-
-.btn-danger {
-    background-color: var(--danger-color);
-    color: white;
-    border: none;
-    padding: 12px 28px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
+.modal-content-box {
+    background-color: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    position: relative;
+    font-family: Arial, sans-serif;
+}
+.modal-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 24px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    color: #666;
 }
-
-.btn-danger:hover {
-    background-color: #d32f2f;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
-}
-
-.btn-logout {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
+.modal-close-btn:hover { color: #000; }
+.custom-modal-btn {
+    background: linear-gradient(to bottom, #ffd35c, #f0a500);
     border: none;
-    padding: 12px 36px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
+    padding: 10px 25px;
+    border-radius: 20px;
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.btn-logout:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 165, 0, 0.4);
-}
-
-@media (max-width: 768px) {
-    .admin-profile-top {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    .admin-settings-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-profile-actions {
-        flex-direction: column;
-        align-items: center;
-    }
+    font-weight: bold;
+    margin-top: 15px;
+    color: #333;
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="admin-profile-container">
-    <div class="admin-profile-header">
-        <h2>My Profile</h2>
-        <p class="subtitle">Manage your admin account settings</p>
-    </div>
 
-    <div class="admin-profile-card">
-        <!-- Profile Top -->
-        <div class="admin-profile-top">
-            <div class="admin-avatar">
-                {% if user.is_authenticated and user.profile_picture %}
-                <img src="{{ user.profile_picture.url }}" alt="Admin Avatar"
-                     onerror="this.style.display='none'; this.parentElement.textContent='👤';">
-                {% else %}
-                <img src="{% static 'images/profile.png' %}" alt="Admin Avatar"
-                     onerror="this.style.display='none'; this.parentElement.textContent='👤';">
-                {% endif %}
-            </div>
-            <div class="admin-details">
-                <h3>{{ user.first_name }} {{ user.last_name }}</h3>
-                <p class="admin-email">{{ user.email }}</p>
-                <span class="admin-role-badge">Administrator</span>
-            </div>
-        </div>
+<div class="profile-card">
 
-        <!-- Account Settings -->
-        <h4 class="admin-settings-title">Account Settings</h4>
+<div class="profile-header">
 
-        <div class="admin-settings-note">
-            <strong>Note:</strong> Personal information such as full name and email can only be changed by a super administrator.
-        </div>
-
-        <div class="admin-settings-grid">
-            <div class="admin-setting-item">
-                <label>Account Type</label>
-                <div class="admin-setting-value">
-                    <span>Administrator</span>
-                    <span class="icon">🛡️</span>
-                </div>
-                <a href="#" class="admin-setting-link">Contact super admin</a>
-            </div>
-
-            <div class="admin-setting-item">
-                <label>Password</label>
-                <div class="admin-setting-value">
-                    <span>••••••••</span>
-                    <span class="icon">🔒</span>
-                </div>
-                <a href="#" class="admin-setting-link">Change password</a>
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="admin-profile-actions">
-            <button class="btn-danger" type="button">
-                Delete Account
-            </button>
-
-            <form method="POST" action="{% url 'logout' %}" style="display:inline;">
-                {% csrf_token %}
-                <button type="submit" class="btn-logout">
-                    Logout
-                </button>
-            </form>
-        </div>
-    </div>
+<div class="profile-image">
+{% if user.is_authenticated and user.profile_picture %}
+<img id="profilePreview" src="{{ user.profile_picture.url }}">
+{% else %}
+<img id="profilePreview" src="{% static 'images/profile.png' %}">
+{% endif %}
 </div>
+
+<div class="profile-info">
+{% if user.is_authenticated %}
+    <h2>{{ user.first_name }} {{ user.last_name }}</h2>
+    <p>{{ user.email }}</p>
+
+    <button class="upload-btn" onclick="openFileManager()">
+    Upload Image
+    </button>
+
+    <!-- Hidden File Input -->
+    <input type="file" id="imageUpload" accept="image/*" style="display:none">
+{% else %}
+    <h2>Guest</h2>
+    <p>Guest Session</p>
+{% endif %}
+</div>
+
+</div>
+
+{% if user.is_authenticated %}
+<h3 class="settings-title">Account Settings</h3>
+
+<div class="settings-note">
+<strong>Note:</strong> Personal information such as full name cannot be personally changed.
+</div>
+
+<div class="settings-row">
+<div class="settings-box">
+<label>Account Type</label>
+<div class="settings-input">
+Administrator
+</div>
+</div>
+
+<div class="settings-box">
+<label>Password</label>
+<div class="settings-input">********</div>
+<a href="#" class="small-link" onclick="openModal('changePasswordModal')">Change password</a>
+</div>
+</div>
+
+<div class="settings-row" style="margin-top: 20px;">
+<div class="settings-box">
+<label>Email Address</label>
+<div class="settings-input">{{ user.email }}</div>
+<a href="#" class="small-link" onclick="openModal('changeEmailModal')">Change email</a>
+</div>
+</div>
+{% endif %}
+
+<div class="profile-actions" style="align-items: center; gap: 20px;">
+{% if user.is_authenticated %}
+<button class="delete-btn" onclick="openModal('deleteAccountModal')">
+Delete Account
+</button>
+
+<form method="POST" action="{% url 'logout' %}" style="margin: 0; padding: 0;">
+{% csrf_token %}
+<button type="submit" class="logout-btn">
+Logout
+</button>
+</form>
+{% else %}
+<a href="{% url 'login' %}" style="text-decoration:none;">
+<button class="logout-btn">
+Log In
+</button>
+</a>
+{% endif %}
+</div>
+
+</div>
+</div>
+
+<!-- Custom Modals -->
+<div id="changePasswordModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('changePasswordModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#333; text-align: center;">Change Password</h3>
+    
+    <div id="pwdStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">For security reasons, please enter your current password to proceed.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdCurrentInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="pwdCurrentInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="sendPwdOtp(this)">Send Verification Code</button>
+        <div id="pwdStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="pwdStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter the 6-digit code sent to your email.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="pwdOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="verifyPwdOtp(this)">Verify Code</button>
+        <div id="pwdStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+
+    <div id="pwdStep3" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter your new password. It must be at least 8 characters long.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdNewInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">New Password</label>
+            <input type="password" id="pwdNewInput" placeholder="Enter new password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="pwdConfirmInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Confirm Password</label>
+            <input type="password" id="pwdConfirmInput" placeholder="Confirm new password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="updatePassword(this)">Update Password</button>
+        <div id="pwdStep3Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="pwdStep3Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Password changed successfully!</div>
+    </div>
+  </div>
+</div>
+
+<div id="changeEmailModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('changeEmailModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#333; text-align: center;">Change Email</h3>
+    
+    <div id="emailStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter your current password and your new email address.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailCurrentPwdInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="emailCurrentPwdInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailNewInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">New Email</label>
+            <input type="email" id="emailNewInput" placeholder="Enter new email" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="initChangeEmail(this)">Send Verification Code</button>
+        <div id="emailStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="emailStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Check your new email inbox for the 6-digit confirmation code.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="emailOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="confirmChangeEmail(this)">Verify & Update</button>
+        <div id="emailStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="emailStep2Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Email changed successfully!</div>
+    </div>
+  </div>
+</div>
+
+<div id="deleteAccountModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('deleteAccountModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#d9534f; text-align: center;">Delete Account</h3>
+    
+    <div id="delStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Deleting your account is permanent. Please enter your current password to proceed.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="delPasswordInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="delPasswordInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px; background: #d9534f; color: white;" onclick="initDeleteAccount(this)">Send Verification Code</button>
+        <div id="delStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="delStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Check your email for the 6-digit confirmation code.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="delOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="delOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        
+        <div style="display: flex; align-items: start; margin-bottom: 20px; gap: 8px;">
+            <input type="checkbox" id="delConfirmCheckbox" style="margin-top: 3px;">
+            <label for="delConfirmCheckbox" style="font-size: 13px; color: #555; line-height: 1.4;">I understand that deleting my account is permanent and cannot be undone.</label>
+        </div>
+
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px; background: #d9534f; color: white;" onclick="confirmDeleteAccount(this)">Permanently Delete Account</button>
+        <div id="delStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="delStep2Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Account deleted. Redirecting...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(modalId) {
+    document.getElementById(modalId).style.display = 'flex';
+}
+function resetPwdState() {
+    if(document.getElementById("pwdStep3Success")) document.getElementById("pwdStep3Success").style.display = "none";
+    if(document.getElementById("pwdStep3Error")) document.getElementById("pwdStep3Error").style.display = "none";
+    if(document.getElementById("pwdStep2Error")) document.getElementById("pwdStep2Error").style.display = "none";
+    if(document.getElementById("pwdStep1Error")) document.getElementById("pwdStep1Error").style.display = "none";
+    if(document.getElementById("pwdNewInput")) {
+        if(document.getElementById("pwdCurrentInput")) document.getElementById("pwdCurrentInput").value = "";
+        document.getElementById("pwdNewInput").value = "";
+        document.getElementById("pwdConfirmInput").value = "";
+        document.getElementById("pwdOtpInput").value = "";
+    }
+    if(document.getElementById("pwdStep3")) {
+        document.getElementById("pwdStep3").style.display = "none";
+        document.getElementById("pwdStep2").style.display = "none";
+        document.getElementById("pwdStep1").style.display = "block";
+    }
+}
+
+function resetDelState() {
+    if(document.getElementById("delStep2Success")) document.getElementById("delStep2Success").style.display = "none";
+    if(document.getElementById("delStep2Error")) document.getElementById("delStep2Error").style.display = "none";
+    if(document.getElementById("delStep1Error")) document.getElementById("delStep1Error").style.display = "none";
+    if(document.getElementById("delPasswordInput")) {
+        document.getElementById("delPasswordInput").value = "";
+        document.getElementById("delOtpInput").value = "";
+        document.getElementById("delConfirmCheckbox").checked = false;
+    }
+    if(document.getElementById("delStep2")) {
+        document.getElementById("delStep2").style.display = "none";
+        document.getElementById("delStep1").style.display = "block";
+    }
+}
+
+function resetEmailState() {
+    if(document.getElementById("emailStep2Success")) document.getElementById("emailStep2Success").style.display = "none";
+    if(document.getElementById("emailStep2Error")) document.getElementById("emailStep2Error").style.display = "none";
+    if(document.getElementById("emailStep1Error")) document.getElementById("emailStep1Error").style.display = "none";
+    if(document.getElementById("emailNewInput")) {
+        document.getElementById("emailCurrentPwdInput").value = "";
+        document.getElementById("emailNewInput").value = "";
+        document.getElementById("emailOtpInput").value = "";
+    }
+    if(document.getElementById("emailStep2")) {
+        document.getElementById("emailStep2").style.display = "none";
+        document.getElementById("emailStep1").style.display = "block";
+    }
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    if (modalId === 'changePasswordModal') resetPwdState();
+    if (modalId === 'deleteAccountModal') resetDelState();
+    if (modalId === 'changeEmailModal') resetEmailState();
+}
+window.addEventListener('click', function(event) {
+    if (event.target.classList.contains('custom-modal')) {
+        event.target.style.display = 'none';
+        resetPwdState();
+        resetDelState();
+        resetEmailState();
+    }
+});
+
+/* OPEN FILE MANAGER */
+function openFileManager(){
+document.getElementById("imageUpload").click();
+}
+
+/* PREVIEW SELECTED IMAGE */
+const imageUpload = document.getElementById("imageUpload");
+const profilePreview = document.getElementById("profilePreview");
+
+if (imageUpload) {
+imageUpload.addEventListener("change", function(){
+
+const file = this.files[0];
+
+if(file){
+    if (file.size > 4 * 1024 * 1024) {
+        alert("File size exceeds 4MB. Please choose a smaller image.");
+        this.value = ""; // Clear selection
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+        profilePreview.src = e.target.result;
+    }
+
+    reader.readAsDataURL(file);
+
+    const formData = new FormData();
+    formData.append("profile_picture", file);
+    
+    const uploadBtn = document.querySelector('.upload-btn');
+    if(uploadBtn) {
+        uploadBtn.disabled = true;
+        uploadBtn.innerText = "Uploading...";
+    }
+
+    fetch("{% url 'upload_profile_picture' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            // Because dashboard might have a different nav icon wrapper
+            const navIcons = document.querySelectorAll('.profile-icon img');
+            if(navIcons.length > 0) {
+                navIcons.forEach(icon => icon.src = data.image_url);
+            }
+        } else {
+            alert(data.error || "Failed to upload image.");
+        }
+    })
+    .catch(err => {
+        alert("Network error occurred during upload.");
+    })
+    .finally(() => {
+        if(uploadBtn) {
+            uploadBtn.disabled = false;
+            uploadBtn.innerText = "Upload Image";
+        }
+    });
+}
+
+});
+}
+
+// Password Change Flow Functions
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function sendPwdOtp(btn) {
+    const pwd = document.getElementById("pwdCurrentInput").value;
+    if(!pwd) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("pwdStep1Error").style.display = "none";
+    
+    fetch("{% url 'send_password_otp' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("pwdStep1").style.display = "none";
+            document.getElementById("pwdStep2").style.display = "block";
+        } else {
+            document.getElementById("pwdStep1Error").innerText = data.error || "Failed to send OTP.";
+            document.getElementById("pwdStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("pwdStep1Error").innerText = "Network error occurred.";
+        document.getElementById("pwdStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function verifyPwdOtp(btn) {
+    const otp = document.getElementById("pwdOtpInput").value.trim();
+    if(!otp) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Verifying...";
+    document.getElementById("pwdStep2Error").style.display = "none";
+    
+    fetch("{% url 'verify_password_otp' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.valid) {
+            document.getElementById("pwdStep2").style.display = "none";
+            document.getElementById("pwdStep3").style.display = "block";
+        } else {
+            document.getElementById("pwdStep2Error").innerText = data.error || "Invalid OTP.";
+            document.getElementById("pwdStep2Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("pwdStep2Error").innerText = "Network error occurred.";
+        document.getElementById("pwdStep2Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Verify Code";
+    });
+}
+
+function updatePassword(btn) {
+    const pwd = document.getElementById("pwdNewInput").value;
+    const confirm = document.getElementById("pwdConfirmInput").value;
+    const errorDiv = document.getElementById("pwdStep3Error");
+    errorDiv.style.display = "none";
+    
+    if(pwd.length < 8) {
+        errorDiv.innerText = "Password must be at least 8 characters.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    if(pwd !== confirm) {
+        errorDiv.innerText = "Passwords do not match.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerText = "Updating...";
+    
+    fetch("{% url 'update_password' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd, confirmPassword: confirm})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("pwdStep3Success").style.display = "block";
+            setTimeout(() => {
+                closeModal('changePasswordModal');
+            }, 2000);
+        } else {
+            errorDiv.innerText = data.error || "Failed to update password.";
+            errorDiv.style.display = "block";
+        }
+    })
+    .catch(err => {
+        errorDiv.innerText = "Network error occurred.";
+        errorDiv.style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Update Password";
+    });
+}
+
+function initDeleteAccount(btn) {
+    const pwd = document.getElementById("delPasswordInput").value;
+    if(!pwd) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("delStep1Error").style.display = "none";
+    
+    fetch("{% url 'init_delete_account' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("delStep1").style.display = "none";
+            document.getElementById("delStep2").style.display = "block";
+        } else {
+            document.getElementById("delStep1Error").innerText = data.error || "Failed to start deletion.";
+            document.getElementById("delStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("delStep1Error").innerText = "Network error occurred.";
+        document.getElementById("delStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function confirmDeleteAccount(btn) {
+    const otp = document.getElementById("delOtpInput").value.trim();
+    const checkbox = document.getElementById("delConfirmCheckbox").checked;
+    const errorDiv = document.getElementById("delStep2Error");
+    errorDiv.style.display = "none";
+    
+    if(!otp) return;
+    if(!checkbox) {
+        errorDiv.innerText = "You must acknowledge that this is permanent.";
+        errorDiv.style.display = "block";
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerText = "Deleting...";
+    
+    fetch("{% url 'confirm_delete_account' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("delStep2Success").style.display = "block";
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 1000);
+        } else {
+            errorDiv.innerText = data.error || "Invalid OTP.";
+            errorDiv.style.display = "block";
+            btn.disabled = false;
+            btn.innerText = "Permanently Delete Account";
+        }
+    })
+    .catch(err => {
+        errorDiv.innerText = "Network error occurred.";
+        errorDiv.style.display = "block";
+        btn.disabled = false;
+        btn.innerText = "Permanently Delete Account";
+    });
+}
+
+function initChangeEmail(btn) {
+    const pwd = document.getElementById("emailCurrentPwdInput").value;
+    const newEmail = document.getElementById("emailNewInput").value.trim();
+    if(!pwd || !newEmail) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("emailStep1Error").style.display = "none";
+    
+    fetch("{% url 'init_change_email' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd, new_email: newEmail})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("emailStep1").style.display = "none";
+            document.getElementById("emailStep2").style.display = "block";
+        } else {
+            document.getElementById("emailStep1Error").innerText = data.error || "Failed to start email change.";
+            document.getElementById("emailStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("emailStep1Error").innerText = "Network error occurred.";
+        document.getElementById("emailStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function confirmChangeEmail(btn) {
+    const otp = document.getElementById("emailOtpInput").value.trim();
+    if(!otp) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Verifying...";
+    document.getElementById("emailStep2Error").style.display = "none";
+    
+    fetch("{% url 'confirm_change_email' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("emailStep2Success").style.display = "block";
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            document.getElementById("emailStep2Error").innerText = data.error || "Invalid OTP.";
+            document.getElementById("emailStep2Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("emailStep2Error").innerText = "Network error occurred.";
+        document.getElementById("emailStep2Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Verify & Update";
+    });
+}
+</script>
 {% endblock %}

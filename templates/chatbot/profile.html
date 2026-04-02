@@ -127,6 +127,15 @@ General
 </div>
 
 </div>
+
+<div class="settings-row" style="margin-top: 20px;">
+<div class="settings-box">
+<label>Email Address</label>
+<div class="settings-input">{{ user.email }}</div>
+<a href="#" class="small-link" onclick="openModal('changeEmailModal')">Change email</a>
+</div>
+</div>
+
 {% endif %}
 
 <div class="profile-actions" style="align-items: center; gap: 20px;">
@@ -266,6 +275,38 @@ Log In
   </div>
 </div>
 
+<div id="changeEmailModal" class="custom-modal">
+  <div class="modal-content-box" style="text-align: left;">
+    <span class="modal-close-btn" onclick="closeModal('changeEmailModal')">&times;</span>
+    <h3 style="margin-bottom:15px; color:#333; text-align: center;">Change Email</h3>
+    
+    <div id="emailStep1">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Enter your current password and your new email address.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailCurrentPwdInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Current Password</label>
+            <input type="password" id="emailCurrentPwdInput" placeholder="Enter current password" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailNewInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">New Email</label>
+            <input type="email" id="emailNewInput" placeholder="Enter new email" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 10px;" onclick="initChangeEmail(this)">Send Verification Code</button>
+        <div id="emailStep1Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+    </div>
+    
+    <div id="emailStep2" style="display: none;">
+        <p style="color:#666; line-height:1.5; margin-bottom:20px; font-size:14px; text-align: center;">Check your new email inbox for the 6-digit confirmation code.</p>
+        <div style="display: flex; flex-direction: column; margin-bottom: 15px;">
+            <label for="emailOtpInput" style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #555;">Verification Code</label>
+            <input type="text" id="emailOtpInput" placeholder="Enter 6-digit OTP" style="padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; text-align: center; letter-spacing: 2px;" maxlength="6" required>
+        </div>
+        <button type="button" class="custom-modal-btn" style="width: 100%; margin-top: 5px;" onclick="confirmChangeEmail(this)">Verify & Update</button>
+        <div id="emailStep2Error" style="color: red; font-size: 13px; text-align: center; margin-top: 10px; display: none;"></div>
+        <div id="emailStep2Success" style="color: green; font-size: 13px; text-align: center; margin-top: 10px; display: none;">Email changed successfully!</div>
+    </div>
+  </div>
+</div>
+
 <div id="deleteAccountModal" class="custom-modal">
   <div class="modal-content-box" style="text-align: left;">
     <span class="modal-close-btn" onclick="closeModal('deleteAccountModal')">&times;</span>
@@ -337,16 +378,33 @@ function resetDelState() {
     }
 }
 
+function resetEmailState() {
+    if(document.getElementById("emailStep2Success")) document.getElementById("emailStep2Success").style.display = "none";
+    if(document.getElementById("emailStep2Error")) document.getElementById("emailStep2Error").style.display = "none";
+    if(document.getElementById("emailStep1Error")) document.getElementById("emailStep1Error").style.display = "none";
+    if(document.getElementById("emailNewInput")) {
+        document.getElementById("emailCurrentPwdInput").value = "";
+        document.getElementById("emailNewInput").value = "";
+        document.getElementById("emailOtpInput").value = "";
+    }
+    if(document.getElementById("emailStep2")) {
+        document.getElementById("emailStep2").style.display = "none";
+        document.getElementById("emailStep1").style.display = "block";
+    }
+}
+
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
     if (modalId === 'changePasswordModal') resetPwdState();
     if (modalId === 'deleteAccountModal') resetDelState();
+    if (modalId === 'changeEmailModal') resetEmailState();
 }
 window.addEventListener('click', function(event) {
     if (event.target.classList.contains('custom-modal')) {
         event.target.style.display = 'none';
         resetPwdState();
         resetDelState();
+        resetEmailState();
     }
 });
 
@@ -685,6 +743,81 @@ function confirmDeleteAccount(btn) {
         errorDiv.style.display = "block";
         btn.disabled = false;
         btn.innerText = "Permanently Delete Account";
+    });
+}
+
+function initChangeEmail(btn) {
+    const pwd = document.getElementById("emailCurrentPwdInput").value;
+    const newEmail = document.getElementById("emailNewInput").value.trim();
+    if(!pwd || !newEmail) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Sending... Please wait";
+    document.getElementById("emailStep1Error").style.display = "none";
+    
+    fetch("{% url 'init_change_email' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({password: pwd, new_email: newEmail})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("emailStep1").style.display = "none";
+            document.getElementById("emailStep2").style.display = "block";
+        } else {
+            document.getElementById("emailStep1Error").innerText = data.error || "Failed to start email change.";
+            document.getElementById("emailStep1Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("emailStep1Error").innerText = "Network error occurred.";
+        document.getElementById("emailStep1Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Send Verification Code";
+    });
+}
+
+function confirmChangeEmail(btn) {
+    const otp = document.getElementById("emailOtpInput").value.trim();
+    if(!otp) return;
+    
+    btn.disabled = true;
+    btn.innerText = "Verifying...";
+    document.getElementById("emailStep2Error").style.display = "none";
+    
+    fetch("{% url 'confirm_change_email' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie('csrftoken')
+        },
+        body: JSON.stringify({otp: otp})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            document.getElementById("emailStep2Success").style.display = "block";
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            document.getElementById("emailStep2Error").innerText = data.error || "Invalid OTP.";
+            document.getElementById("emailStep2Error").style.display = "block";
+        }
+    })
+    .catch(err => {
+        document.getElementById("emailStep2Error").innerText = "Network error occurred.";
+        document.getElementById("emailStep2Error").style.display = "block";
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerText = "Verify & Update";
     });
 }
 
