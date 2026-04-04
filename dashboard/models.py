@@ -114,6 +114,3 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title
-
-    def __str__(self):
-        return f"{self.date} - Avg: {self.average_response_time}s"

@@ -93,7 +93,7 @@ class Command(BaseCommand):
                 },
                 {
                     'question': 'How do I update my student information?',
-                    'answer': 'Student information can be updated through the Profile page. Some fields like student number are locked and can only be changed by an administrator.',
+                    'answer': 'Your information can be updated through the Profile page. Some fields like your name are locked and can only be changed by an administrator.',
                     'tags': 'profile, student, update',
                     'category': 'account',
                 },

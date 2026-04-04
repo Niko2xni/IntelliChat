@@ -63,16 +63,15 @@ def signup_view(request):
         first_name = request.POST.get('firstName', '').strip()
         last_name = request.POST.get('lastName', '').strip()
         email = request.POST.get('email', '').strip().lower()
-        student_number = request.POST.get('studentNumber', '').strip()
         password = request.POST.get('password', '').strip()
         confirm_password = request.POST.get('confirmPassword', '').strip()
 
         form_data = {
             'first_name': first_name, 'last_name': last_name,
-            'email': email, 'student_number': student_number,
+            'email': email,
         }
 
-        if not all([first_name, last_name, email, student_number, password]):
+        if not all([first_name, last_name, email, password]):
             errors['general'] = "All fields are required."
         
         if email != request.session.get('otp_email_target'):
@@ -81,8 +80,7 @@ def signup_view(request):
         if Student.objects.filter(email=email).exists():
             errors['email'] = 'This email is already registered.'
         
-        if Student.objects.filter(student_number=student_number).exists():
-            errors['studentNumber'] = 'This student number is already registered.'
+
 
         if password != confirm_password:
             errors['confirmPassword'] = 'Passwords do not match.'
@@ -95,7 +93,6 @@ def signup_view(request):
                     password=password,
                     first_name=first_name,
                     last_name=last_name,
-                    student_number=student_number,
                 )
                 login(request, user)
                 
@@ -176,16 +173,11 @@ def send_otp(request):
         try:
             data = json.loads(request.body)
             email = data.get('email', '').strip().lower()
-            student_number = data.get('studentNumber', '').strip()
-
             if not (email.endswith('@tip.edu.ph') or email.endswith('@gmail.com')):
                 return JsonResponse({'success': False, 'error': 'Must be a TIP or Gmail email.'})
                 
             if Student.objects.filter(email=email).exists():
                 return JsonResponse({'success': False, 'error': 'This email is already registered.'})
-                
-            if student_number and Student.objects.filter(student_number=student_number).exists():
-                return JsonResponse({'success': False, 'error': 'This student number is already registered.'})
 
             otp = "".join(str(secrets.randbelow(10)) for _ in range(6))
             

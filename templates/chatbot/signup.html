@@ -287,8 +287,7 @@ function sendOTPRequest(email) {
     fetch("{% url 'send_otp' %}", {
         method: "POST",
         headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
-        // Disregard backend requirement, sending dummy student number since backend still expects it maybe
-        body: JSON.stringify({ email: email, studentNumber: "" })
+        body: JSON.stringify({ email: email })
     })
     .then(res => res.json())
     .then(data => {
@@ -317,7 +316,7 @@ function resendOTP() {
     fetch("{% url 'send_otp' %}", {
         method: "POST",
         headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, studentNumber: "" })
+        body: JSON.stringify({ email: email })
     })
     .then(res => res.json())
     .then(data => {
@@ -358,12 +357,6 @@ function verifyAndSubmit() {
     .then(data => {
         if (data.valid) {
             isVerified = true;
-            // append dummy studentNumber so backend doesn't crash if it's strictly required
-            const hiddenStudentNum = document.createElement("input");
-            hiddenStudentNum.type = "hidden";
-            hiddenStudentNum.name = "studentNumber";
-            hiddenStudentNum.value = "0000000";
-            signupForm.appendChild(hiddenStudentNum);
             
             signupForm.requestSubmit();
         } else {
