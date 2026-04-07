@@ -70,21 +70,33 @@
 </a>
 
 <div class="sidebar-section">
+<div class="sidebar-section-header">
 <div class="sidebar-section-title">Recent chats</div>
+{% if user.is_authenticated %}
+<span class="sidebar-session-count">{{ chat_session_summaries|length }}</span>
+{% endif %}
+</div>
 
 {% if user.is_authenticated %}
-    {% for session in chat_sessions %}
+<div class="sidebar-chat-list">
+    {% for session in chat_session_summaries %}
     <a
         href="{% url 'chat_session' session.id %}"
         class="sidebar-chat-link"
         data-session-id="{{ session.id }}"
     >
-        <i class="fas fa-comment-alt"></i>
-        <span>{{ session.title }}</span>
+        <div class="sidebar-chat-main">
+            <div class="sidebar-chat-title-row">
+                <span class="sidebar-chat-title">{{ session.title }}</span>
+                <time class="sidebar-chat-time" datetime="{{ session.updated_iso }}">{{ session.updated_label }}</time>
+            </div>
+            <p class="sidebar-chat-preview">{{ session.preview }}</p>
+        </div>
     </a>
     {% empty %}
     <div class="sidebar-empty">No saved chats yet.</div>
     {% endfor %}
+</div>
 {% else %}
 <div class="sidebar-empty">Log in to save your chat sessions.</div>
 {% endif %}

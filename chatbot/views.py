@@ -353,6 +353,7 @@ def logout_view(request):
 
 
 def profile_view(request):
+    chat_sessions = _chat_sessions_for_user(request.user)
     latest_role_request = None
     if request.user.is_authenticated:
         latest_role_request = RoleRequest.objects.filter(
@@ -360,7 +361,11 @@ def profile_view(request):
         ).select_related('reviewed_by').order_by('-requested_at').first()
 
     return render(request, 'chatbot/profile.html', {
-        'chat_sessions': _chat_sessions_for_user(request.user),
+        'chat_sessions': chat_sessions,
+        'chat_session_summaries': _chat_session_summaries_for_user(
+            request.user,
+            sessions=chat_sessions,
+        ),
         'latest_role_request': latest_role_request,
         'account_type_payload': _account_type_payload(request.user),
     })
