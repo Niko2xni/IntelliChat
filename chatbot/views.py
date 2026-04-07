@@ -16,6 +16,15 @@ def chatbot_home(request):
     return render(request, 'chatbot/index.html')
 
 
+@ensure_csrf_cookie
+def request_form_view(request):
+    """Display request form for authenticated users."""
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    return render(request, 'chatbot/request_form.html')
+
+
 def login_view(request):
     errors = {}
     email_value = ''

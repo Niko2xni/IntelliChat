@@ -5,11 +5,25 @@
             <h1>IntelliChat</h1>
         </div>
         <div class="header-right">
-            <div class="notifications">
-                <button class="notification-btn" title="Messages">
-                    <span class="icon">💬</span>
-                    <span class="badge">3</span>
-                </button>
+            <div class="header-icons">
+                <!-- Notification Icon -->
+                <div class="notification-wrapper">
+                    <button class="header-icon notif-icon notification-btn" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notif-badge" style="display: none;">0</span>
+                    </button>
+                    
+                    <!-- Notification Dropdown -->
+                    <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
+                        <div class="notification-header">
+                            <h3>Notifications</h3>
+                            <button id="markAllReadBtn" class="mark-all-read-btn">Mark all as read</button>
+                        </div>
+                        <div class="notification-list">
+                            <!-- Notifications will be loaded here -->
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="user-menu">
                 <a href="{% url 'dashboard:profile' %}" class="user-btn" title="My Profile" style="display:flex; align-items:center; justify-content:center; text-decoration:none;">
@@ -23,3 +37,5 @@
         </div>
     </div>
 </header>
+
+<script src="{% static 'js/notifications.js' %}"></script>

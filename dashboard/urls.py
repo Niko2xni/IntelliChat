@@ -21,4 +21,12 @@ urlpatterns = [
     path('api/delete-document/<int:doc_id>/', views.delete_document, name='delete_document'),
     path('api/download-document/<int:doc_id>/', views.download_document, name='download_document'),
     path('logging/', views.logging_monitoring, name='logging'),
+    path('role-requests/', views.role_requests, name='role_requests'),
+    path('api/manage-role-request/<int:req_id>/', views.manage_role_request, name='manage_role_request'),
+    path('api/notifications/', views.get_notifications, name='get_notifications'),
+    path('api/notifications/count/', views.get_notification_count, name='get_notification_count'),
+    path('api/notifications/<int:notification_id>/read/', views.mark_notification_read, name='mark_notification_read'),
+    path('api/notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
+    path('api/notifications/submit-request/', views.submit_user_request, name='submit_user_request'),
+    path('api/notifications/<int:notification_id>/respond/', views.respond_to_user_request, name='respond_to_user_request'),
 ]

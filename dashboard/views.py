@@ -4,6 +4,7 @@ from django.http import JsonResponse, FileResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
+from django.utils import timezone
 from .models import DashboardMetrics, CommonInquiry, ResponseTimeData, FAQ, Document
 import json
 
@@ -421,4 +422,263 @@ def logging_monitoring(request):
         {"timestamp": "2026-03-29 16:50:00", "action": "Declined Student Leader request", "user": "admin", "details": "Declined role for student 2024567 (Invalid organization)"}
     ]
     return render(request, 'dashboard/logging.html', {'logs': logs})
+
+
+def _get_session_notifications(request):
+    notifications = request.session.get('ui_notifications', [])
+    if isinstance(notifications, list):
+        return notifications
+    return []
+
+
+def _save_session_notifications(request, notifications):
+    request.session['ui_notifications'] = notifications
+    request.session.modified = True
+
+
+def _next_notification_id(notifications):
+    if not notifications:
+        return 1
+    return max(item.get('id', 0) for item in notifications) + 1
+
+
+def _visible_notifications_for_user(request, notifications):
+    if not request.user.is_authenticated:
+        return []
+
+    if request.user.is_staff:
+        return notifications
+
+    user_email = request.user.email
+    return [item for item in notifications if item.get('user_email') == user_email]
+
+
+@require_http_methods(["GET"])
+def get_notifications(request):
+    """Return current user's unread notifications for the UI dropdown."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    notifications = _get_session_notifications(request)
+    visible = _visible_notifications_for_user(request, notifications)
+    unread = [item for item in visible if not item.get('is_read', False)]
+    unread.sort(key=lambda item: item.get('created_at', ''), reverse=True)
+
+    payload = []
+    for item in unread[:10]:
+        payload.append({
+            'id': item.get('id'),
+            'title': item.get('title', 'Notification'),
+            'message': item.get('message', ''),
+            'type': item.get('type', 'info'),
+            'created_at': item.get('created_at'),
+            'action_url': item.get('action_url', ''),
+        })
+
+    return JsonResponse({'notifications': payload, 'unread_count': len(payload)})
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def mark_notification_read(request, notification_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    notifications = _get_session_notifications(request)
+    for item in notifications:
+        if item.get('id') != notification_id:
+            continue
+
+        target_email = item.get('user_email')
+        if not request.user.is_staff and target_email != request.user.email:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+        item['is_read'] = True
+        _save_session_notifications(request, notifications)
+        return JsonResponse({'status': 'success', 'message': 'Notification marked as read'})
+
+    return JsonResponse({'error': 'Notification not found'}, status=404)
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def mark_all_notifications_read(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    notifications = _get_session_notifications(request)
+    updated = 0
+
+    for item in notifications:
+        if request.user.is_staff or item.get('user_email') == request.user.email:
+            if not item.get('is_read', False):
+                item['is_read'] = True
+                updated += 1
+
+    _save_session_notifications(request, notifications)
+
+    return JsonResponse({
+        'status': 'success',
+        'message': f'Marked {updated} notifications as read',
+    })
+
+
+@require_http_methods(["GET"])
+def get_notification_count(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'unread_count': 0})
+
+    notifications = _get_session_notifications(request)
+    visible = _visible_notifications_for_user(request, notifications)
+    unread_count = len([item for item in visible if not item.get('is_read', False)])
+
+    return JsonResponse({'unread_count': unread_count})
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def submit_user_request(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+    request_type = data.get('type', 'other')
+    details = data.get('details', '').strip()
+
+    notifications = _get_session_notifications(request)
+    now_iso = timezone.now().isoformat()
+    next_id = _next_notification_id(notifications)
+
+    notifications.append({
+        'id': next_id,
+        'title': f"{request_type.replace('_', ' ').title()} Request",
+        'message': f"{request.user.get_full_name() or request.user.username} submitted a request. {details}".strip(),
+        'type': 'info',
+        'created_at': now_iso,
+        'action_url': '/dashboard/role-requests/',
+        'is_read': False,
+        'user_email': None,
+        'requester_email': request.user.email,
+    })
+
+    notifications.append({
+        'id': next_id + 1,
+        'title': 'Request Submitted',
+        'message': f"Your {request_type.replace('_', ' ')} request has been submitted.",
+        'type': 'success',
+        'created_at': now_iso,
+        'action_url': '/chatbot/profile/',
+        'is_read': False,
+        'user_email': request.user.email,
+    })
+
+    _save_session_notifications(request, notifications)
+    return JsonResponse({'status': 'success', 'message': 'Request submitted successfully'})
+
+
+@require_http_methods(["POST"])
+@csrf_exempt
+def respond_to_user_request(request, notification_id):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return JsonResponse({'error': 'Admin authentication required'}, status=401)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+    response_type = data.get('response_type', 'info')
+    details = data.get('details', '').strip()
+
+    notifications = _get_session_notifications(request)
+    original = None
+
+    for item in notifications:
+        if item.get('id') == notification_id:
+            original = item
+            break
+
+    if original is None:
+        return JsonResponse({'error': 'Notification not found'}, status=404)
+
+    requester_email = original.get('requester_email') or original.get('user_email')
+    if not requester_email:
+        return JsonResponse({'error': 'No requester found for this notification'}, status=400)
+
+    original['is_read'] = True
+
+    notifications.append({
+        'id': _next_notification_id(notifications),
+        'title': 'Admin Response',
+        'message': f"Your request was marked as {response_type}. {details}".strip(),
+        'type': 'success' if response_type == 'approved' else 'warning',
+        'created_at': timezone.now().isoformat(),
+        'action_url': '/chatbot/profile/',
+        'is_read': False,
+        'user_email': requester_email,
+    })
+
+    _save_session_notifications(request, notifications)
+    return JsonResponse({'status': 'success', 'message': 'Response sent successfully'})
+
+
+@user_passes_test(is_admin, login_url='login')
+def role_requests(request):
+    """Account Elevation Requests management page."""
+    requests_data = [
+        {
+            "id": 1,
+            "user": "jdelacruz@tip.edu.ph",
+            "student_number": "202612345",
+            "position": "President",
+            "organization": "Student Council",
+            "status": "pending",
+            "requested_at": "2026-04-05 10:20:00",
+        },
+        {
+            "id": 2,
+            "user": "msantos@gmail.com",
+            "student_number": "202598765",
+            "position": "Secretary",
+            "organization": "Computer Society",
+            "status": "pending",
+            "requested_at": "2026-04-06 14:15:22",
+        },
+        {
+            "id": 3,
+            "user": "rtorres@tip.edu.ph",
+            "student_number": "202411223",
+            "position": "Member",
+            "organization": "Math Club",
+            "status": "accepted",
+            "requested_at": "2026-04-04 09:10:00",
+        },
+        {
+            "id": 4,
+            "user": "lreyes@tip.edu.ph",
+            "student_number": "202354321",
+            "position": "Vice President",
+            "organization": "Engineering Org",
+            "status": "rejected",
+            "requested_at": "2026-04-02 11:45:00",
+        },
+    ]
+
+    return render(request, 'dashboard/role_requests.html', {'requests': requests_data})
+
+
+@user_passes_test(is_admin, login_url='login')
+@require_http_methods(["POST"])
+@csrf_exempt
+def manage_role_request(request, req_id):
+    """Accept or reject a role request entry (demo API)."""
+    action = request.POST.get('action', '').strip().lower()
+    if action in ['accept', 'reject']:
+        return JsonResponse({'status': 'success', 'message': f'Request {action}ed successfully.'})
+
+    return JsonResponse({'status': 'error', 'message': 'Invalid action'}, status=400)
 

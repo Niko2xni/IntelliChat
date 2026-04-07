@@ -26,10 +26,24 @@
 
 <div class="header-icons">
 
-<a href="#" class="header-icon notif-icon">
-<i class="fas fa-bell"></i>
-<span class="notif-badge"></span>
-</a>
+    <!-- Notification Icon -->
+            <div class="notification-wrapper">
+                <button class="header-icon notif-icon notification-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" style="display: none;">0</span>
+                </button>
+                
+                <!-- Notification Dropdown -->
+                <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
+                    <div class="notification-header">
+                        <h3>Notifications</h3>
+                        <button id="markAllReadBtn" class="mark-all-read-btn">Mark all as read</button>
+                    </div>
+                    <div class="notification-list">
+                        <!-- Notifications will be loaded here -->
+                    </div>
+                </div>
+            </div>
 
 <a href="{% url 'chatbot_home' %}" class="header-icon profile-icon">
 {% if user.is_authenticated and user.profile_picture %}
@@ -111,8 +125,10 @@
 General
 <i class="fas fa-question-circle"></i>
 </div>
-
 <a href="#" class="small-link" onclick="openModal('contactAdminModal')">Contact admin</a>
+<a href="{% url 'request_form' %}" class="small-link" style="margin-left: 10px;">
+    <i class="fas fa-paper-plane"></i> Submit Request
+</a>
 
 </div>
 
@@ -822,6 +838,27 @@ function confirmChangeEmail(btn) {
 }
 
 
+</script>
+
+<script src="{% static 'js/notifications.js' %}"></script>
+
+<script>
+    // Test notification system on profile page load
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Profile page loaded - checking notification system...');
+        
+        // Check if notification system is initialized
+        if (typeof window.notificationSystem !== 'undefined') {
+            console.log('✅ Notification system is working on profile page!');
+            
+            // Test notification count loading
+            setTimeout(() => {
+                window.notificationSystem.loadNotificationCount();
+            }, 1000);
+        } else {
+            console.error('❌ Notification system not found on profile page');
+        }
+    });
 </script>
 
 </body>

@@ -1,377 +1,332 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<title>Sign Up - IntelliChat</title>
-
-<link rel="stylesheet" href="{% static 'css/signup.css' %}">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
+    <meta charset="UTF-8">
+    <title>Sign Up - IntelliChat</title>
+    <link rel="stylesheet" href="{% static 'css/signup.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
 <body>
 
-<div class="logo-section">
-<img src="{% static 'images/logo.png' %}" alt="IntelliChat Logo" class="auth-logo">
-</div>
-
-<div class="auth-container">
-<div class="auth-card">
-<div class="auth-form">
-
-<h2>Register</h2>
-<p class="auth-subtitle">Neque porro quisquam est qui dolorem ipsum</p>
-
-<div id="systemNotification" class="error-banner" style="display: {% if errors.general %}block{% else %}none{% endif %};">
-    <i class="fas fa-exclamation-circle"></i> <span id="systemNotificationText">{{ errors.general|default:"" }}</span>
-</div>
-
-<form class="signup-form" id="signupForm" method="POST" action="{% url 'signup' %}">
-{% csrf_token %}
-
-<!-- PERSONAL INFORMATION -->
-
-<div class="form-section">
-
-<h3>Personal Information</h3>
-
-<div class="form-row">
-
-<div class="form-group">
-<label for="firstName">First name</label>
-
-<div class="input-wrapper {% if errors.firstName %}input-error{% endif %}">
-<i class="fas fa-user"></i>
-<input type="text" id="firstName" name="firstName" placeholder="First name"
-       value="{{ form_data.first_name }}" required>
-</div>
-{% if errors.firstName %}
-<span class="error-message">{{ errors.firstName }}</span>
-{% endif %}
-
-</div>
-
-<div class="form-group">
-<label for="lastName">Last name</label>
-
-<div class="input-wrapper {% if errors.lastName %}input-error{% endif %}">
-<i class="fas fa-user"></i>
-<input type="text" id="lastName" name="lastName" placeholder="Last name"
-       value="{{ form_data.last_name }}" required>
-</div>
-{% if errors.lastName %}
-<span class="error-message">{{ errors.lastName }}</span>
-{% endif %}
-
-</div>
-
-</div>
-
-</div>
-
-
-<!-- ACCOUNT INFORMATION -->
-
-<div class="form-section">
-
-<h3>Account Information</h3>
-
-<div class="form-row">
-
-<div class="form-group" style="flex: 1;">
-
-<label for="email">Email</label>
-
-<div class="input-wrapper {% if errors.email %}input-error{% endif %}">
-<i class="fas fa-envelope"></i>
-<input type="email"
-       id="email"
-       name="email"
-       placeholder="Enter your email"
-       value="{{ form_data.email }}"
-       pattern="^[a-zA-Z0-9._%+-]+@(tip\.edu\.ph|gmail\.com)$"
-       title="Please use a TIP or Gmail email"
-       required>
-</div>
-{% if errors.email %}
-<span class="error-message">{{ errors.email }}</span>
-{% endif %}
-
-</div>
-
-</div>
-
-<br>
-
-<div class="form-row">
-
-<div class="form-group">
-
-<label for="password">Password</label>
-
-<div class="input-wrapper {% if errors.password %}input-error{% endif %}">
-<i class="fas fa-lock"></i>
-<input type="password" id="password" name="password" placeholder="Minimum 8 characters"
-       minlength="8" required>
-<i class="fas fa-eye eye-icon" onclick="togglePassword('password',this)"></i>
-</div>
-{% if errors.password %}
-<span class="error-message">{{ errors.password }}</span>
-{% endif %}
-
-</div>
-
-<div class="form-group">
-
-<label for="confirmPassword">Re-enter password</label>
-
-<div class="input-wrapper {% if errors.confirmPassword %}input-error{% endif %}">
-<i class="fas fa-lock"></i>
-<input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter password" required>
-<i class="fas fa-eye eye-icon" onclick="togglePassword('confirmPassword',this)"></i>
-</div>
-{% if errors.confirmPassword %}
-<span class="error-message">{{ errors.confirmPassword }}</span>
-{% endif %}
-
-</div>
-
-</div>
-
-</div>
-
-
-<button type="submit" class="auth-btn" id="signupBtn">Sign up</button>
-
-<div id="otpSection" class="form-section" style="display: none; text-align: center; margin-top: 20px;">
-    <h3>Verify Your Email</h3>
-    <p>We've sent a 6-digit code to <br><span id="displayEmail" style="font-weight: bold; color: #f4a300;"></span></p>
-    
-    <div class="input-wrapper" style="margin: 20px auto; max-width: 250px;">
-        <i class="fas fa-shield-alt"></i>
-        <input type="text" id="otpInput" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 5px; font-size: 1.2rem;">
+    <div class="logo-section">
+        <img src="{% static 'images/logo.png' %}" alt="IntelliChat Logo" class="auth-logo">
     </div>
-    
-    <button type="button" class="auth-btn" id="verifyBtn" onclick="verifyAndSubmit()" style="margin-top: 10px;">Verify & Register</button>
-    
-    <div class="timer-section" style="margin: 15px 0; font-size: 0.9rem; color: #666;">
-        <span id="timerText">Resend code in: <span id="countdown">60</span>s</span>
-        <a href="javascript:void(0)" id="resendLink" onclick="resendOTP()" style="display: none; font-weight: bold; text-decoration: none; color: #d32f2f;">Resend Code</a>
+
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-form">
+
+                <h2>Register</h2>
+                <p class="auth-subtitle">Create your account to access OSA IntelliChat and get instant assistance with student concerns anytime, anywhere.</p>
+
+                <div id="systemNotification" class="error-banner" style="display: {% if errors.general %}block{% else %}none{% endif %};">
+                    <i class="fas fa-exclamation-circle"></i> 
+                    <span id="systemNotificationText">{{ errors.general|default:"" }}</span>
+                </div>
+
+                <form class="signup-form" id="signupForm" method="POST" action="{% url 'signup' %}">
+                    {% csrf_token %}
+
+                    <div class="form-section">
+                        <h3>Personal Information</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="firstName">First name</label>
+                                <div class="input-wrapper {% if errors.firstName %}input-error{% endif %}">
+                                    <i class="fas fa-user"></i>
+                                    <input type="text" id="firstName" name="firstName" placeholder="First name" value="{{ form_data.first_name }}" required>
+                                </div>
+                                {% if errors.firstName %}
+                                    <span class="error-message">{{ errors.firstName }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="lastName">Last name</label>
+                                <div class="input-wrapper {% if errors.lastName %}input-error{% endif %}">
+                                    <i class="fas fa-user"></i>
+                                    <input type="text" id="lastName" name="lastName" placeholder="Last name" value="{{ form_data.last_name }}" required>
+                                </div>
+                                {% if errors.lastName %}
+                                    <span class="error-message">{{ errors.lastName }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Account Information</h3>
+                        <div class="form-row">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="email">Email</label>
+                                <div class="input-wrapper {% if errors.email %}input-error{% endif %}">
+                                    <i class="fas fa-envelope"></i>
+                                    <input type="email" id="email" name="email" placeholder="Enter your email" value="{{ form_data.email }}" pattern="^[a-zA-Z0-9._%+-]+@(tip\.edu\.ph|gmail\.com)$" title="Please use a TIP or Gmail email" required>
+                                </div>
+                                {% if errors.email %}
+                                    <span class="error-message">{{ errors.email }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <br>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="password">Password</label>
+                                <div class="input-wrapper {% if errors.password %}input-error{% endif %}">
+                                    <i class="fas fa-lock"></i>
+                                    <input type="password" id="password" name="password" placeholder="Minimum 8 characters" minlength="8" required>
+                                    <i class="fas fa-eye eye-icon" onclick="togglePassword('password',this)"></i>
+                                </div>
+                                {% if errors.password %}
+                                    <span class="error-message">{{ errors.password }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirmPassword">Re-enter password</label>
+                                <div class="input-wrapper {% if errors.confirmPassword %}input-error{% endif %}">
+                                    <i class="fas fa-lock"></i>
+                                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Re-enter password" required>
+                                    <i class="fas fa-eye eye-icon" onclick="togglePassword('confirmPassword',this)"></i>
+                                </div>
+                                {% if errors.confirmPassword %}
+                                    <span class="error-message">{{ errors.confirmPassword }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="auth-btn" id="signupBtn">Sign up</button>
+
+                    <div id="otpSection" class="form-section" style="display: none; text-align: center; margin-top: 20px;">
+                        <h3>Verify Your Email</h3>
+                        <p>We've sent a 6-digit code to <br><span id="displayEmail" style="font-weight: bold; color: #f4a300;"></span></p>
+                        
+                        <div class="input-wrapper" style="margin: 20px auto; max-width: 250px;">
+                            <i class="fas fa-shield-alt"></i>
+                            <input type="text" id="otpInput" placeholder="000000" maxlength="6" style="text-align: center; letter-spacing: 5px; font-size: 1.2rem;">
+                        </div>
+                        
+                        <button type="button" class="auth-btn" id="verifyBtn" onclick="verifyAndSubmit()" style="margin-top: 10px;">Verify & Register</button>
+                        
+                        <div class="timer-section" style="margin: 15px 0; font-size: 0.9rem; color: #666;">
+                            <span id="timerText">Resend code in: <span id="countdown">60</span>s</span>
+                            <a href="javascript:void(0)" id="resendLink" onclick="resendOTP()" style="display: none; font-weight: bold; text-decoration: none; color: #d32f2f;">Resend Code</a>
+                        </div>
+                    </div>
+
+                    <div class="auth-footer" id="authFooter">
+                        <p>Already have an account? <a href="{% url 'login' %}" class="auth-link">Login here</a></p>
+                    </div>
+
+                </form>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="auth-footer" id="authFooter">
-<p>Already have an account? 
-<a href="{% url 'login' %}" class="auth-link">Login here</a>
-</p>
-</div>
+    <script>
+        let isVerified = false;
+        let timerInterval;
 
-</form>
+        const signupForm = document.getElementById("signupForm");
+        const password = document.getElementById("password");
+        const confirmPassword = document.getElementById("confirmPassword");
+        const emailField = document.getElementById("email");
+        const otpSection = document.getElementById("otpSection");
+        const otpInput = document.getElementById("otpInput");
+        const systemNotification = document.getElementById("systemNotification");
+        const systemNotificationText = document.getElementById("systemNotificationText");
+        const formSections = document.querySelectorAll(".form-section:not(#otpSection)");
+        const signupBtn = document.getElementById("signupBtn");
+        const authFooter = document.getElementById("authFooter");
 
-</div>
-</div>
-</div>
+        function togglePassword(fieldId, icon) {
+            const field = document.getElementById(fieldId);
+            if (field.type === "password") {
+                field.type = "text";
+                icon.classList.replace("fa-eye", "fa-eye-slash");
+            } else {
+                field.type = "password";
+                icon.classList.replace("fa-eye-slash", "fa-eye");
+            }
+        }
 
-<script>
-let isVerified = false;
-let timerInterval;
+        function showNotification(message) {
+            systemNotificationText.innerText = message;
+            systemNotification.style.display = "block";
+        }
 
-function togglePassword(fieldId, icon) {
-    const field = document.getElementById(fieldId);
-    if (field.type === "password") {
-        field.type = "text";
-        icon.classList.remove("fa-eye");
-        icon.classList.add("fa-eye-slash");
-    } else {
-        field.type = "password";
-        icon.classList.remove("fa-eye-slash");
-        icon.classList.add("fa-eye");
-    }
-}
+        function hideNotification() {
+            systemNotification.style.display = "none";
+        }
 
-const signupForm = document.getElementById("signupForm");
-const password = document.getElementById("password");
-const confirmPassword = document.getElementById("confirmPassword");
-const emailField = document.getElementById("email");
-const otpSection = document.getElementById("otpSection");
-const otpInput = document.getElementById("otpInput");
-const systemNotification = document.getElementById("systemNotification");
-const systemNotificationText = document.getElementById("systemNotificationText");
-const formSections = document.querySelectorAll(".form-section:not(#otpSection)");
-const signupBtn = document.getElementById("signupBtn");
-const authFooter = document.getElementById("authFooter");
+        function validatePasswords() {
+            confirmPassword.setCustomValidity("");
+            if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
+                confirmPassword.setCustomValidity("Passwords do not match");
+            }
+        }
 
-function showNotification(message) {
-    systemNotificationText.innerText = message;
-    systemNotification.style.display = "block";
-}
+        password.addEventListener("input", validatePasswords);
+        confirmPassword.addEventListener("input", validatePasswords);
+        emailField.addEventListener("input", () => {
+            emailField.setCustomValidity("");
+            hideNotification();
+        });
 
-function hideNotification() {
-    systemNotification.style.display = "none";
-}
+        function startTimer() {
+            let timeLeft = 60;
+            const countdownEl = document.getElementById("countdown");
+            const timerText = document.getElementById("timerText");
+            const resendLink = document.getElementById("resendLink");
 
-function validatePasswords() {
-    confirmPassword.setCustomValidity("");
-    if (password.value && confirmPassword.value && password.value !== confirmPassword.value) {
-        confirmPassword.setCustomValidity("Passwords do not match");
-    }
-}
+            resendLink.style.display = "none";
+            timerText.style.display = "inline";
+            countdownEl.innerText = timeLeft;
 
-password.addEventListener("input", validatePasswords);
-confirmPassword.addEventListener("input", validatePasswords);
-emailField.addEventListener("input", () => {
-    emailField.setCustomValidity("");
-    hideNotification();
-});
-
-function startTimer() {
-    let timeLeft = 60;
-    const countdownEl = document.getElementById("countdown");
-    const timerText = document.getElementById("timerText");
-    const resendLink = document.getElementById("resendLink");
-
-    resendLink.style.display = "none";
-    timerText.style.display = "inline";
-    countdownEl.innerText = timeLeft;
-
-    clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        countdownEl.innerText = timeLeft;
-        if (timeLeft <= 0) {
             clearInterval(timerInterval);
-            timerText.style.display = "none";
-            resendLink.style.display = "inline";
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                countdownEl.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerText.style.display = "none";
+                    resendLink.style.display = "inline";
+                }
+            }, 1000);
         }
-    }, 1000);
-}
 
-function showOtpUI(email) {
-    document.getElementById("displayEmail").innerText = email;
-    formSections.forEach(s => s.style.display = "none");
-    signupBtn.style.display = "none";
-    authFooter.style.display = "none";
-    otpSection.style.display = "block";
-    startTimer();
-}
-
-signupForm.addEventListener("submit", function (e) {
-    if (isVerified) return;
-    e.preventDefault();
-    hideNotification();
-
-    confirmPassword.setCustomValidity("");
-    emailField.setCustomValidity("");
-
-    if (password.value !== confirmPassword.value) {
-        confirmPassword.setCustomValidity("Passwords do not match");
-        confirmPassword.reportValidity();
-        return;
-    }
-
-    const email = emailField.value.trim().toLowerCase();
-    if (!email.endsWith("@tip.edu.ph") && !email.endsWith("@gmail.com")) {
-        emailField.setCustomValidity("Please use a valid @tip.edu.ph or @gmail.com email address.");
-        emailField.reportValidity();
-        return;
-    }
-
-    sendOTPRequest(email);
-});
-
-function sendOTPRequest(email) {
-    const originalText = signupBtn.innerText;
-    signupBtn.innerText = "Sending code...";
-    signupBtn.disabled = true;
-
-    fetch("{% url 'send_otp' %}", {
-        method: "POST",
-        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email })
-    })
-    .then(res => res.json())
-    .then(data => {
-        signupBtn.innerText = originalText;
-        signupBtn.disabled = false;
-        if (data.success) {
-            showOtpUI(email);
-        } else {
-            showNotification(data.error || "Failed to send OTP.");
-        }
-    })
-    .catch(() => {
-        signupBtn.innerText = originalText;
-        signupBtn.disabled = false;
-        showNotification("An error occurred while sending OTP.");
-    });
-}
-
-function resendOTP() {
-    const email = emailField.value.trim().toLowerCase();
-    const resendLink = document.getElementById("resendLink");
-    resendLink.innerText = "Sending...";
-    resendLink.style.pointerEvents = "none";
-    hideNotification();
-
-    fetch("{% url 'send_otp' %}", {
-        method: "POST",
-        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email })
-    })
-    .then(res => res.json())
-    .then(data => {
-        resendLink.innerText = "Resend Code";
-        resendLink.style.pointerEvents = "auto";
-        if (data.success) {
+        function showOtpUI(email) {
+            document.getElementById("displayEmail").innerText = email;
+            formSections.forEach(s => s.style.display = "none");
+            signupBtn.style.display = "none";
+            authFooter.style.display = "none";
+            otpSection.style.display = "block";
             startTimer();
-        } else {
-            showNotification(data.error || "Failed to resend OTP.");
         }
-    })
-    .catch(() => {
-        resendLink.innerText = "Resend Code";
-        resendLink.style.pointerEvents = "auto";
-        showNotification("An error occurred while resending OTP.");
-    });
-}
 
-function verifyAndSubmit() {
-    hideNotification();
-    const enteredOtp = otpInput.value.trim();
-    const verifyBtn = document.getElementById("verifyBtn");
+        signupForm.addEventListener("submit", function (e) {
+            if (isVerified) return;
+            e.preventDefault();
+            hideNotification();
 
-    if (enteredOtp.length !== 6) {
-        showNotification("Please enter the 6-digit verification code.");
-        return;
-    }
+            if (password.value !== confirmPassword.value) {
+                confirmPassword.setCustomValidity("Passwords do not match");
+                confirmPassword.reportValidity();
+                return;
+            }
 
-    verifyBtn.innerText = "Verifying...";
-    verifyBtn.disabled = true;
+            const email = emailField.value.trim().toLowerCase();
+            if (!email.endsWith("@tip.edu.ph") && !email.endsWith("@gmail.com")) {
+                emailField.setCustomValidity("Please use a valid @tip.edu.ph or @gmail.com email address.");
+                emailField.reportValidity();
+                return;
+            }
 
-    fetch("{% url 'verify_otp' %}", {
-        method: "POST",
-        headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
-        body: JSON.stringify({ otp: enteredOtp })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.valid) {
-            isVerified = true;
-            
-            signupForm.requestSubmit();
-        } else {
-            verifyBtn.innerText = "Verify & Register";
-            verifyBtn.disabled = false;
-            showNotification(data.error || "Invalid OTP. Please check your email.");
+            sendOTPRequest(email);
+        });
+
+        function sendOTPRequest(email) {
+            const originalText = signupBtn.innerText;
+            signupBtn.innerText = "Sending code...";
+            signupBtn.disabled = true;
+
+            fetch("{% url 'send_otp' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email, studentNumber: "" })
+            })
+            .then(res => res.json())
+            .then(data => {
+                signupBtn.innerText = originalText;
+                signupBtn.disabled = false;
+                if (data.success) {
+                    showOtpUI(email);
+                } else {
+                    showNotification(data.error || "Failed to send OTP.");
+                }
+            })
+            .catch(() => {
+                signupBtn.innerText = originalText;
+                signupBtn.disabled = false;
+                showNotification("An error occurred while sending OTP.");
+            });
         }
-    })
-    .catch(() => {
-        verifyBtn.innerText = "Verify & Register";
-        verifyBtn.disabled = false;
-        showNotification("An error occurred during verification.");
-    });
-}
-</script>
+
+        function resendOTP() {
+            const email = emailField.value.trim().toLowerCase();
+            const resendLink = document.getElementById("resendLink");
+            resendLink.innerText = "Sending...";
+            resendLink.style.pointerEvents = "none";
+            hideNotification();
+
+            fetch("{% url 'send_otp' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email, studentNumber: "" })
+            })
+            .then(res => res.json())
+            .then(data => {
+                resendLink.innerText = "Resend Code";
+                resendLink.style.pointerEvents = "auto";
+                if (data.success) {
+                    startTimer();
+                } else {
+                    showNotification(data.error || "Failed to resend OTP.");
+                }
+            })
+            .catch(() => {
+                resendLink.innerText = "Resend Code";
+                resendLink.style.pointerEvents = "auto";
+                showNotification("An error occurred while resending OTP.");
+            });
+        }
+
+        function verifyAndSubmit() {
+            hideNotification();
+            const enteredOtp = otpInput.value.trim();
+            const verifyBtn = document.getElementById("verifyBtn");
+
+            if (enteredOtp.length !== 6) {
+                showNotification("Please enter the 6-digit verification code.");
+                return;
+            }
+
+            verifyBtn.innerText = "Verifying...";
+            verifyBtn.disabled = true;
+
+            fetch("{% url 'verify_otp' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                body: JSON.stringify({ otp: enteredOtp })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.valid) {
+                    isVerified = true;
+                    const hiddenStudentNum = document.createElement("input");
+                    hiddenStudentNum.type = "hidden";
+                    hiddenStudentNum.name = "studentNumber";
+                    hiddenStudentNum.value = "0000000";
+                    signupForm.appendChild(hiddenStudentNum);
+                    signupForm.requestSubmit();
+                } else {
+                    verifyBtn.innerText = "Verify & Register";
+                    verifyBtn.disabled = false;
+                    showNotification(data.error || "Invalid OTP. Please check your email.");
+                }
+            })
+            .catch(() => {
+                verifyBtn.innerText = "Verify & Register";
+                verifyBtn.disabled = false;
+                showNotification("An error occurred during verification.");
+            });
+        }
+    </script>
 
 </body>
 </html>

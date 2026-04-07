@@ -1,0 +1,232 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Role Requests - IntelliChat Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+.requests-container {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+.requests-header {
+    margin-bottom: 20px;
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 15px;
+}
+.requests-header h2 {
+    color: #333;
+    font-size: 24px;
+}
+.requests-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.requests-table th, .requests-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    vertical-align: middle;
+}
+.requests-table th {
+    background-color: #fca311;
+    color: white;
+    font-weight: 600;
+}
+.requests-table tr:hover {
+    background-color: #f9f9f9;
+}
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    display: inline-block;
+    text-align: center;
+}
+.status-pending { background: #fff3cd; color: #856404; }
+.status-accepted { background: #d4edda; color: #155724; }
+.status-rejected { background: #f8d7da; color: #721c24; }
+
+.action-btn {
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    color: white;
+    margin-right: 5px;
+    transition: opacity 0.2s;
+}
+.action-btn:hover {
+    opacity: 0.8;
+}
+.btn-accept {
+    background-color: #28a745;
+}
+.btn-reject {
+    background-color: #dc3545;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="requests-container">
+    <div class="requests-header">
+        <h2>Account Elevation Requests</h2>
+        <p style="color: #666; margin-top: 5px;">Manage users requesting to change their account type to Student Type / Student Leader.</p>
+    </div>
+    
+    <div class="requests-controls" style="display: flex; gap: 15px; margin-bottom: 20px;">
+        <input type="text" id="reqSearch" placeholder="Search by student number, user email, organization..." style="flex: 1; padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; outline: none;" onfocus="this.style.borderColor='#fca311'" onblur="this.style.borderColor='#e0e0e0'">
+        <select id="reqFilter" style="padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 14px; background: white; outline: none; cursor: pointer;">
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+        </select>
+    </div>
+
+    <table class="requests-table">
+        <thead>
+            <tr>
+                <th>Date Requested</th>
+                <th>Student info</th>
+                <th>Organization Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for req in requests %}
+            <tr id="req-row-{{ req.id }}">
+                <td style="color: #666; font-size: 14px;">{{ req.requested_at }}</td>
+                <td>
+                    <div style="font-weight: bold; color: #333;">{{ req.student_number }}</div>
+                    <div style="font-size: 12px; color: #777;">{{ req.user }}</div>
+                </td>
+                <td>
+                    <div style="font-weight: 500; color: #444;">{{ req.position }}</div>
+                    <div style="font-size: 13px; color: #888;">{{ req.organization }}</div>
+                </td>
+                <td>
+                    <span class="status-badge status-{{ req.status }}" id="badge-{{ req.id }}">
+                        {{ req.status|title }}
+                    </span>
+                </td>
+                <td>
+                    {% if req.status == 'pending' %}
+                        <div id="actions-{{ req.id }}">
+                            <button class="action-btn btn-accept" onclick="handleRequest({{ req.id }}, 'accept')">Accept</button>
+                            <button class="action-btn btn-reject" onclick="handleRequest({{ req.id }}, 'reject')">Reject</button>
+                        </div>
+                    {% else %}
+                        <div style="font-size: 13px; color: #999;">No actions available</div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #888; padding: 30px;">
+                    No pending elevation requests.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function handleRequest(reqId, action) {
+        if (!confirm(`Are you sure you want to ${action} this request?`)) return;
+
+        fetch(`/dashboard/api/manage-role-request/${reqId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `action=${action}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Update UI visually
+                const badge = document.getElementById(`badge-${reqId}`);
+                badge.className = `status-badge status-${action}ed`;
+                badge.innerText = action === 'accept' ? 'Accepted' : 'Rejected';
+                
+                const actionsContainer = document.getElementById(`actions-${reqId}`);
+                actionsContainer.innerHTML = `<span style="font-size: 13px; color: #999;">No actions available</span>`;
+            } else {
+                alert(data.message || 'An error occurred while processing the request.');
+            }
+        })
+        .catch(() => {
+            alert('A network error occurred.');
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        // Make sidebar link active
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => item.classList.remove('active'));
+        const currentLink = document.querySelector('a[href*="role-requests"]');
+        if(currentLink) currentLink.classList.add('active');
+
+        // Search and Filter Logic
+        const searchInput = document.getElementById('reqSearch');
+        const filterSelect = document.getElementById('reqFilter');
+        const rows = document.querySelectorAll('.requests-table tbody tr');
+
+        function filterRequests() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filterValue = filterSelect.value.toLowerCase();
+
+            rows.forEach(row => {
+                if (row.children.length === 1) return; // Skip empty message row
+                
+                const textContent = row.textContent.toLowerCase();
+                const statusBadge = row.querySelector('.status-badge').textContent.toLowerCase().trim();
+                
+                const matchesSearch = textContent.includes(searchTerm);
+                let matchesFilter = true;
+                
+                if (filterValue !== 'all') {
+                    matchesFilter = statusBadge === filterValue;
+                }
+
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        if (searchInput && filterSelect) {
+            searchInput.addEventListener('input', filterRequests);
+            filterSelect.addEventListener('change', filterRequests);
+        }
+    });
+</script>
+{% endblock %}

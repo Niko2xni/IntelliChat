@@ -128,6 +128,7 @@ html, body {
     padding: 0 30px;
     box-shadow: var(--shadow);
     z-index: 100;
+    position: relative;
 }
 
 .header-content {
@@ -150,6 +151,31 @@ html, body {
     display: flex;
     align-items: center;
     gap: 20px;
+}
+
+.header-icons {
+    display: flex;
+    align-items: center;
+}
+
+.header-icon.notif-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    font-size: 20px;
+    color: #555;
+    transition: transform 0.2s ease;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-icon.notif-icon:hover {
+    transform: scale(1.1);
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .notification-btn,
@@ -180,6 +206,205 @@ html, body {
     align-items: center;
     justify-content: center;
     font-size: 12px;
+}
+
+.notif-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff4d4d;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 5px;
+    border-radius: 50%;
+    min-width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Notification Dropdown */
+.notification-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 350px;
+    max-width: 450px;
+    max-height: 500px;
+    overflow: hidden;
+    z-index: 9999;
+    margin-top: 10px;
+}
+
+.notification-wrapper {
+    position: relative;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.mark-all-read-btn {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.mark-all-read-btn:hover {
+    background-color: rgba(255, 165, 0, 0.1);
+}
+
+.notification-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+.notification-item.empty {
+    justify-content: center;
+    text-align: center;
+    color: var(--text-light);
+    font-style: italic;
+}
+
+.notification-content {
+    flex: 1;
+    margin-right: 15px;
+}
+
+.notification-content h4 {
+    margin: 0 0 5px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.notification-content p {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.4;
+}
+
+.notification-time {
+    font-size: 11px;
+    color: #999;
+}
+
+.notification-actions {
+    flex-shrink: 0;
+}
+
+.notification-action {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--primary-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 11px;
+    transition: background-color 0.2s ease;
+}
+
+.notification-action:hover {
+    background-color: var(--primary-hover);
+}
+
+/* Notification type styles */
+.notification-info {
+    border-left: 3px solid #17a2b8;
+}
+
+.notification-success {
+    border-left: 3px solid #28a745;
+}
+
+.notification-warning {
+    border-left: 3px solid #ffc107;
+}
+
+.notification-error {
+    border-left: 3px solid #dc3545;
+}
+
+.notification-message {
+    border-left: 3px solid #6c757d;
+}
+
+.notification-system {
+    border-left: 3px solid #e83e8c;
+}
+
+/* Response Buttons for Admin */
+.response-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.response-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.approve-btn {
+    background-color: #28a745;
+    color: white;
+}
+
+.approve-btn:hover {
+    background-color: #218838;
+}
+
+.reject-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+.reject-btn:hover {
+    background-color: #c82333;
 }
 
 /* Content Area */
