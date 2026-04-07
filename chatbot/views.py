@@ -216,6 +216,23 @@ def _serialize_role_request(role_request):
     }
 
 
+def _account_type_payload(user):
+    if not user.is_authenticated:
+        return {
+            'value': Student.ACCOUNT_GENERAL,
+            'label': 'General',
+            'organization': '',
+            'position': '',
+        }
+
+    return {
+        'value': user.account_type,
+        'label': user.get_account_type_display(),
+        'organization': user.leader_organization,
+        'position': user.leader_position,
+    }
+
+
 @ensure_csrf_cookie
 def chatbot_home(request, session_id=None):
     chat_sessions = _chat_sessions_for_user(request.user)
@@ -345,6 +362,7 @@ def profile_view(request):
     return render(request, 'chatbot/profile.html', {
         'chat_sessions': _chat_sessions_for_user(request.user),
         'latest_role_request': latest_role_request,
+        'account_type_payload': _account_type_payload(request.user),
     })
 
 
@@ -370,6 +388,12 @@ def submit_role_request(request):
         if not all([student_number, position, organization]):
             return JsonResponse({'success': False, 'error': 'All fields are required.'}, status=400)
 
+        if request.user.account_type == Student.ACCOUNT_STUDENT_LEADER:
+            return JsonResponse({
+                'success': False,
+                'error': 'Your account is already set to Student Leader.',
+            }, status=400)
+
         existing_pending = RoleRequest.objects.filter(
             user=request.user,
             status=RoleRequest.STATUS_PENDING,
@@ -381,6 +405,7 @@ def submit_role_request(request):
                 'already_pending': True,
                 'message': 'You already have a pending request under review.',
                 'request': _serialize_role_request(existing_pending),
+                'account_type': _account_type_payload(request.user),
                 'request_id': existing_pending.id,
             })
 
@@ -401,6 +426,7 @@ def submit_role_request(request):
             'already_pending': False,
             'message': 'Request submitted successfully and sent for admin review.',
             'request': _serialize_role_request(role_request),
+            'account_type': _account_type_payload(request.user),
             'request_id': role_request.id,
         })
     except json.JSONDecodeError:
@@ -422,6 +448,7 @@ def my_role_request_status(request):
         'success': True,
         'has_request': latest_request is not None,
         'request': _serialize_role_request(latest_request),
+        'account_type': _account_type_payload(request.user),
     })
 
 

@@ -677,6 +677,15 @@ def manage_role_request(request, req_id):
     role_request.reviewed_by = request.user
     role_request.save(update_fields=['status', 'reviewed_at', 'reviewed_by'])
 
+    if action == 'accept':
+        # Local import avoids import cycles at module import time.
+        from chatbot.models import Student
+
+        role_request.user.account_type = Student.ACCOUNT_STUDENT_LEADER
+        role_request.user.leader_organization = role_request.organization
+        role_request.user.leader_position = role_request.position
+        role_request.user.save(update_fields=['account_type', 'leader_organization', 'leader_position'])
+
     create_audit_log(
         'Approved Student Leader request' if action == 'accept' else 'Declined Student Leader request',
         request.user.email,

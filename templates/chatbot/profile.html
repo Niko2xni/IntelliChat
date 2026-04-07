@@ -143,10 +143,17 @@
 <label>Account Type</label>
 
 <div class="settings-input">
-General
+<span id="accountTypeLabel">{{ account_type_payload.label }}</span>
 <i class="fas fa-question-circle"></i>
 </div>
-<a href="#" class="small-link" onclick="openModal('contactAdminModal')">Contact admin</a>
+<div id="accountTypeExtra" style="margin-top: 8px; font-size: 12px; color: #666; line-height: 1.4;">
+{% if account_type_payload.value == 'student_leader' %}
+{{ account_type_payload.position }} • {{ account_type_payload.organization }}
+{% else %}
+Standard student access
+{% endif %}
+</div>
+<a href="#" id="contactAdminLink" class="small-link" onclick="handleContactAdminClick(event)">Contact admin</a>
 
 </div>
 
@@ -508,6 +515,7 @@ function submitRoleRequest() {
                 }, 1200);
             } else {
                 alert(data.error || "Failed to submit request.");
+                refreshRoleRequestStatus();
             }
         })
         .catch(() => {
@@ -652,6 +660,45 @@ function sendPwdOtp(btn) {
     });
 }
 
+function renderAccountType(accountType) {
+    const labelEl = document.getElementById("accountTypeLabel");
+    const extraEl = document.getElementById("accountTypeExtra");
+    const contactLink = document.getElementById("contactAdminLink");
+
+    if (!labelEl || !extraEl || !contactLink || !accountType) {
+        return;
+    }
+
+    labelEl.innerText = accountType.label || "General";
+
+    if (accountType.value === "student_leader") {
+        const org = accountType.organization || "Organization";
+        const pos = accountType.position || "Member";
+        extraEl.innerText = `${pos} • ${org}`;
+        contactLink.innerText = "Already Student Leader";
+        contactLink.style.opacity = "0.6";
+        contactLink.style.pointerEvents = "none";
+        contactLink.style.cursor = "not-allowed";
+    } else {
+        extraEl.innerText = "Standard student access";
+        contactLink.innerText = "Contact admin";
+        contactLink.style.opacity = "1";
+        contactLink.style.pointerEvents = "auto";
+        contactLink.style.cursor = "pointer";
+    }
+}
+
+function handleContactAdminClick(event) {
+    const contactLink = document.getElementById("contactAdminLink");
+    if (contactLink && contactLink.style.pointerEvents === "none") {
+        event.preventDefault();
+        return;
+    }
+
+    event.preventDefault();
+    openModal('contactAdminModal');
+}
+
 function renderRoleRequestStatus(statusResponse) {
     const statusText = document.getElementById("roleRequestStatusText");
     const statusMeta = document.getElementById("roleRequestMeta");
@@ -687,6 +734,7 @@ function refreshRoleRequestStatus() {
     .then(data => {
         if (data.success) {
             renderRoleRequestStatus(data);
+            renderAccountType(data.account_type);
         }
     })
     .catch(() => {

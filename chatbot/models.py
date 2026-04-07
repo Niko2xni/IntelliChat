@@ -5,12 +5,26 @@ from django.contrib.auth.models import AbstractUser
 class Student(AbstractUser):
     """Custom user model for IntelliChat students."""
 
+    ACCOUNT_GENERAL = 'general'
+    ACCOUNT_STUDENT_LEADER = 'student_leader'
+    ACCOUNT_TYPE_CHOICES = [
+        (ACCOUNT_GENERAL, 'General'),
+        (ACCOUNT_STUDENT_LEADER, 'Student Leader'),
+    ]
+
     email = models.EmailField(
         unique=True,
         help_text='Must be a TIP (@tip.edu.ph) or Gmail (@gmail.com) email',
     )
 
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
+    account_type = models.CharField(
+        max_length=30,
+        choices=ACCOUNT_TYPE_CHOICES,
+        default=ACCOUNT_GENERAL,
+    )
+    leader_organization = models.CharField(max_length=150, blank=True)
+    leader_position = models.CharField(max_length=100, blank=True)
 
     # Use email as the login field
     USERNAME_FIELD = 'email'

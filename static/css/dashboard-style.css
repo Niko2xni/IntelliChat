@@ -1,5 +1,6 @@
 :root {
     --primary-color: #FFA500;
+    --primary-hover: #E69500;
     --primary-dark: #FF9500;
     --primary-light: #FFB84D;
     --secondary-color: #FFD700;
@@ -186,6 +187,12 @@ html, body {
     position: relative;
     font-size: 24px;
     transition: transform 0.2s ease;
+}
+
+.user-btn .icon {
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-light);
 }
 
 .notification-btn:hover,
