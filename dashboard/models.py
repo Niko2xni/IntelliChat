@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -114,3 +115,60 @@ class Document(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class RoleRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='role_requests',
+    )
+    student_number = models.CharField(max_length=50)
+    position = models.CharField(max_length=100)
+    organization = models.CharField(max_length=150)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='reviewed_role_requests',
+    )
+
+    class Meta:
+        ordering = ['-requested_at']
+
+    def __str__(self):
+        return f"{self.user.email} - {self.organization} ({self.status})"
+
+
+class AuditLog(models.Model):
+    action = models.CharField(max_length=120)
+    actor_email = models.EmailField()
+    details = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.action} - {self.actor_email}"
+
+
+def create_audit_log(action, actor_email, details=''):
+    AuditLog.objects.create(
+        action=action,
+        actor_email=actor_email,
+        details=details,
+    )

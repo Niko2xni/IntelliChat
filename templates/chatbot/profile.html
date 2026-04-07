@@ -64,9 +64,30 @@
 
 <aside class="sidebar">
 
-<div class="sidebar-item">
+<a href="{% url 'chatbot_home' %}" class="sidebar-item active">
 <i class="fas fa-plus"></i>
 <span>New chat</span>
+</a>
+
+<div class="sidebar-section">
+<div class="sidebar-section-title">Recent chats</div>
+
+{% if user.is_authenticated %}
+    {% for session in chat_sessions %}
+    <a
+        href="{% url 'chat_session' session.id %}"
+        class="sidebar-chat-link"
+        data-session-id="{{ session.id }}"
+    >
+        <i class="fas fa-comment-alt"></i>
+        <span>{{ session.title }}</span>
+    </a>
+    {% empty %}
+    <div class="sidebar-empty">No saved chats yet.</div>
+    {% endfor %}
+{% else %}
+<div class="sidebar-empty">Log in to save your chat sessions.</div>
+{% endif %}
 </div>
 
 
@@ -126,9 +147,6 @@ General
 <i class="fas fa-question-circle"></i>
 </div>
 <a href="#" class="small-link" onclick="openModal('contactAdminModal')">Contact admin</a>
-<a href="{% url 'request_form' %}" class="small-link" style="margin-left: 10px;">
-    <i class="fas fa-paper-plane"></i> Submit Request
-</a>
 
 </div>
 
@@ -429,16 +447,44 @@ function submitRoleRequest() {
     if(form.reportValidity()) {
         const btn = form.querySelector("button");
         const originalText = btn.innerText;
-        btn.innerText = "Request Sent!";
+        const studentNumber = document.getElementById("slStudentNumber").value.trim();
+        const position = document.getElementById("slPosition").value.trim();
+        const organization = document.getElementById("slOrg").value.trim();
+
+        btn.innerText = "Sending...";
         btn.disabled = true;
-        
-        // Mock backend processing delay
-        setTimeout(() => {
-            closeModal('contactAdminModal');
+
+        fetch("{% url 'submit_role_request' %}", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                student_number: studentNumber,
+                position: position,
+                organization: organization
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerText = "Request Sent!";
+                setTimeout(() => {
+                    closeModal('contactAdminModal');
+                    form.reset();
+                }, 1200);
+            } else {
+                alert(data.error || "Failed to submit request.");
+            }
+        })
+        .catch(() => {
+            alert("Network error occurred.");
+        })
+        .finally(() => {
             btn.innerText = originalText;
             btn.disabled = false;
-            form.reset();
-        }, 1500);
+        });
     }
 }
 </script>
@@ -448,30 +494,11 @@ function submitRoleRequest() {
 const menuIcon = document.querySelector('.menu-icon');
 const sidebar = document.querySelector('.sidebar');
 const profileArea = document.querySelector('.profile-area');
-const notifIcon = document.querySelector('.notif-icon');
-const announcementsPopup = document.getElementById('announcementsPopup');
 
 menuIcon.addEventListener('click', () => {
 sidebar.classList.toggle('hidden');
 profileArea.classList.toggle('full-width');
 });
-
-// Toggle announcements popup
-if (notifIcon && announcementsPopup) {
-    notifIcon.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
-    });
-
-    document.addEventListener('click', (e) => {
-        if (announcementsPopup.style.display === 'block' && 
-            !notifIcon.contains(e.target) && 
-            !announcementsPopup.contains(e.target)) {
-            announcementsPopup.style.display = 'none';
-        }
-    });
-}
 
 /* OPEN FILE MANAGER */
 function openFileManager(){

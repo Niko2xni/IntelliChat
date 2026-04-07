@@ -83,18 +83,18 @@
         <tbody>
             {% for log in logs %}
             <tr>
-                <td style="color: #666; font-size: 14px;">{{ log.timestamp }}</td>
+                <td style="color: #666; font-size: 14px;">{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
                 <td>
                     <span class="action-badge 
                         {% if 'Approved' in log.action %}action-approved{% endif %}
-                        {% if 'Declined' in log.action %}action-declined{% endif %}
+                        {% if 'Declined' in log.action or 'Rejected' in log.action %}action-declined{% endif %}
                         {% if 'Uploaded' in log.action %}action-uploaded{% endif %}
-                        {% if 'Deleted' in log.action %}action-deleted{% endif %}
+                        {% if 'Deleted' in log.action or 'Updated' in log.action %}action-deleted{% endif %}
                     ">
                         {{ log.action }}
                     </span>
                 </td>
-                <td style="font-weight: 500;">{{ log.user }}</td>
+                <td style="font-weight: 500;">{{ log.actor_email }}</td>
                 <td style="color: #555;">{{ log.details }}</td>
             </tr>
             {% endfor %}

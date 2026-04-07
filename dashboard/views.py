@@ -5,7 +5,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
 from django.utils import timezone
-from .models import DashboardMetrics, CommonInquiry, ResponseTimeData, FAQ, Document
+from .models import (
+    AuditLog,
+    CommonInquiry,
+    DashboardMetrics,
+    Document,
+    FAQ,
+    ResponseTimeData,
+    RoleRequest,
+    create_audit_log,
+)
 import json
 
 
@@ -324,6 +333,11 @@ def upload_document(request):
             category=category,
             status='active'
         )
+        create_audit_log(
+            'Uploaded Document',
+            request.user.email,
+            f'Uploaded "{doc.title}" in {doc.category}.',
+        )
         
         return JsonResponse({
             'status': 'success',
@@ -341,10 +355,16 @@ def delete_document(request, doc_id):
     """API endpoint to delete a document."""
     try:
         doc = Document.objects.get(id=doc_id)
+        title = doc.title
         # Delete the file from storage
         if doc.file:
             doc.file.delete()
         doc.delete()
+        create_audit_log(
+            'Deleted Document',
+            request.user.email,
+            f'Deleted "{title}" from documents.',
+        )
         return JsonResponse({'status': 'success', 'message': 'Document deleted successfully'})
     except Document.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Document not found'}, status=404)
@@ -376,6 +396,11 @@ def update_document(request, doc_id):
             doc.file_size = file.size
 
         doc.save()
+        create_audit_log(
+            'Updated Document',
+            request.user.email,
+            f'Updated "{doc.title}" in {doc.category}.',
+        )
         return JsonResponse({'status': 'success', 'message': 'Document updated successfully'})
     except Document.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Document not found'}, status=404)
@@ -413,14 +438,7 @@ def format_file_size(bytes_size):
 @user_passes_test(is_admin, login_url='login')
 def logging_monitoring(request):
     """Logging and Monitoring page."""
-    # Dummy mock data for now, acting as frontend showcase
-    logs = [
-        {"timestamp": "2026-04-02 23:45:00", "action": "Approved Student Leader request", "user": "admin", "details": "Approved role for student 2026123"},
-        {"timestamp": "2026-04-02 22:30:15", "action": "Changed Password", "user": "user@tip.edu.ph", "details": "User changed their password via reset link"},
-        {"timestamp": "2026-04-01 14:10:00", "action": "Deleted Document", "user": "admin", "details": "Deleted 'Old_Manual.pdf' from Documents"},
-        {"timestamp": "2026-03-30 09:12:33", "action": "Uploaded Document", "user": "admin", "details": "Uploaded 'Syllabus.docx' to Documents"},
-        {"timestamp": "2026-03-29 16:50:00", "action": "Declined Student Leader request", "user": "admin", "details": "Declined role for student 2024567 (Invalid organization)"}
-    ]
+    logs = AuditLog.objects.all()
     return render(request, 'dashboard/logging.html', {'logs': logs})
 
 
@@ -629,44 +647,7 @@ def respond_to_user_request(request, notification_id):
 @user_passes_test(is_admin, login_url='login')
 def role_requests(request):
     """Account Elevation Requests management page."""
-    requests_data = [
-        {
-            "id": 1,
-            "user": "jdelacruz@tip.edu.ph",
-            "student_number": "202612345",
-            "position": "President",
-            "organization": "Student Council",
-            "status": "pending",
-            "requested_at": "2026-04-05 10:20:00",
-        },
-        {
-            "id": 2,
-            "user": "msantos@gmail.com",
-            "student_number": "202598765",
-            "position": "Secretary",
-            "organization": "Computer Society",
-            "status": "pending",
-            "requested_at": "2026-04-06 14:15:22",
-        },
-        {
-            "id": 3,
-            "user": "rtorres@tip.edu.ph",
-            "student_number": "202411223",
-            "position": "Member",
-            "organization": "Math Club",
-            "status": "accepted",
-            "requested_at": "2026-04-04 09:10:00",
-        },
-        {
-            "id": 4,
-            "user": "lreyes@tip.edu.ph",
-            "student_number": "202354321",
-            "position": "Vice President",
-            "organization": "Engineering Org",
-            "status": "rejected",
-            "requested_at": "2026-04-02 11:45:00",
-        },
-    ]
+    requests_data = RoleRequest.objects.select_related('user', 'reviewed_by')
 
     return render(request, 'dashboard/role_requests.html', {'requests': requests_data})
 
@@ -675,10 +656,26 @@ def role_requests(request):
 @require_http_methods(["POST"])
 @csrf_exempt
 def manage_role_request(request, req_id):
-    """Accept or reject a role request entry (demo API)."""
+    """API endpoint to accept or reject a role request."""
     action = request.POST.get('action', '').strip().lower()
-    if action in ['accept', 'reject']:
-        return JsonResponse({'status': 'success', 'message': f'Request {action}ed successfully.'})
+    if action not in ['accept', 'reject']:
+        return JsonResponse({'status': 'error', 'message': 'Invalid action'}, status=400)
 
-    return JsonResponse({'status': 'error', 'message': 'Invalid action'}, status=400)
+    try:
+        role_request = RoleRequest.objects.select_related('user').get(id=req_id)
+    except RoleRequest.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Request not found'}, status=404)
+
+    role_request.status = RoleRequest.STATUS_ACCEPTED if action == 'accept' else RoleRequest.STATUS_REJECTED
+    role_request.reviewed_at = timezone.now()
+    role_request.reviewed_by = request.user
+    role_request.save(update_fields=['status', 'reviewed_at', 'reviewed_by'])
+
+    create_audit_log(
+        'Approved Student Leader request' if action == 'accept' else 'Declined Student Leader request',
+        request.user.email,
+        f'{action.title()}ed role request for {role_request.user.email} ({role_request.organization} - {role_request.position}).',
+    )
+
+    return JsonResponse({'status': 'success', 'message': f'Request {action}ed successfully.'})
 

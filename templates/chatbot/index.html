@@ -4,50 +4,40 @@
 <head>
     <title>IntelliChat</title>
 
-    <!-- External CSS -->
     <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
 </head>
 
 <body>
 
 <header class="header">
     <div class="header-content">
-
-        <!-- Menu Icon on the left -->
         <div class="menu-icon">
             <i class="fas fa-bars"></i>
         </div>
 
-        <!-- Logo in the center -->
         <h1 class="logo">
             <img src="{% static 'images/logo.png' %}">
         </h1>
 
-        <!-- Header Icons on the right -->
         <div class="header-icons">
-    <!-- Notification Icon -->
             <div class="notification-wrapper">
                 <button class="header-icon notif-icon notification-btn" title="Notifications">
                     <i class="fas fa-bell"></i>
                     <span class="notif-badge" style="display: none;">0</span>
                 </button>
-                
-                <!-- Notification Dropdown -->
+
                 <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
                     <div class="notification-header">
                         <h3>Notifications</h3>
                         <button id="markAllReadBtn" class="mark-all-read-btn">Mark all as read</button>
                     </div>
                     <div class="notification-list">
-                        <!-- Notifications will be loaded here -->
                     </div>
                 </div>
             </div>
 
-            <!-- Profile Icon -->
             <a href="{% url 'profile' %}" class="header-icon profile-icon">
                 {% if user.is_authenticated and user.profile_picture %}
                 <img src="{{ user.profile_picture.url }}" alt="Profile">
@@ -56,27 +46,40 @@
                 {% endif %}
             </a>
         </div>
-
     </div>
 </header>
 
-
-
 <div class="main-container">
-
     <aside class="sidebar">
-
-        <div class="sidebar-item active">
+        <div class="sidebar-item active" id="newChatButton">
             <i class="fas fa-plus"></i>
             <span>New chat</span>
         </div>
 
+        <div class="sidebar-section">
+            <div class="sidebar-section-title">Recent chats</div>
+
+            {% if user.is_authenticated %}
+                {% for session in chat_sessions %}
+                <a
+                    href="{% url 'chat_session' session.id %}"
+                    class="sidebar-chat-link{% if current_session and current_session.id == session.id %} current{% endif %}"
+                    data-session-id="{{ session.id }}"
+                >
+                    <i class="fas fa-comment-alt"></i>
+                    <span>{{ session.title }}</span>
+                </a>
+                {% empty %}
+                <div class="sidebar-empty">No saved chats yet.</div>
+                {% endfor %}
+            {% else %}
+            <div class="sidebar-empty">Log in to save your chat sessions.</div>
+            {% endif %}
+        </div>
     </aside>
 
     <main class="chat-area">
-
-        <!-- Welcome screen (centered, visible before first message) -->
-        <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-screen" id="welcomeScreen"{% if current_session %} style="display: none;"{% endif %}>
             <div class="welcome-message">
                 {% if user.is_authenticated %}
                 <h3>Hi, {{ user.first_name }}</h3>
@@ -99,8 +102,17 @@
             </div>
         </div>
 
-        <!-- Active chat screen (hidden until first message) -->
-        <div class="active-chat" id="activeChat" style="display: none;">
+        <div class="active-chat" id="activeChat"{% if not current_session %} style="display: none;"{% endif %}>
+            <div class="chat-session-header">
+                <h2 id="chatSessionTitle">
+                    {% if current_session %}
+                    {{ current_session.title }}
+                    {% else %}
+                    New chat
+                    {% endif %}
+                </h2>
+            </div>
+
             <div class="chat-messages" id="chatMessages"></div>
 
             <div class="chat-input-wrapper">
@@ -115,33 +127,39 @@
                         <i class="fas fa-paper-plane"></i>
                     </div>
                 </div>
+                <div class="rate-limit-note" id="chatStatusMessage"></div>
             </div>
         </div>
-
     </main>
-
 </div>
 
+{{ current_messages|json_script:"initial-chat-messages" }}
 <script>
-// --- Elements ---
 const welcomeScreen = document.getElementById('welcomeScreen');
 const activeChat = document.getElementById('activeChat');
 const chatMessages = document.getElementById('chatMessages');
-
 const welcomeInput = document.getElementById('welcomeInput');
 const welcomeSendBtn = document.getElementById('welcomeSendBtn');
 const chatInputActive = document.getElementById('chatInputActive');
 const activeSendBtn = document.getElementById('activeSendBtn');
+const menuIcon = document.querySelector('.menu-icon');
+const sidebar = document.querySelector('.sidebar');
+const chatArea = document.querySelector('.chat-area');
+const newChatButton = document.getElementById('newChatButton');
+const chatSessionTitle = document.getElementById('chatSessionTitle');
+const chatStatusMessage = document.getElementById('chatStatusMessage');
 
-let chatStarted = false;
+let chatStarted = {% if current_session %}true{% else %}false{% endif %};
+let currentSessionId = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
+let uploadedFiles = [];
 
 function switchToActiveChat() {
     if (!chatStarted) {
         chatStarted = true;
         welcomeScreen.style.display = 'none';
         activeChat.style.display = 'flex';
-        chatInputActive.focus();
     }
+    chatInputActive.focus();
 }
 
 function addMessage(text, sender) {
@@ -153,48 +171,119 @@ function addMessage(text, sender) {
     return msgDiv;
 }
 
-// --- Send Message to Gemini ---
+function renderSavedMessages() {
+    const saved = JSON.parse(document.getElementById('initial-chat-messages').textContent);
+    saved.forEach((message) => {
+        addMessage(message.content, message.role === 'user' ? 'user' : 'bot');
+    });
+}
+
+function setStatusMessage(message, isError = false) {
+    chatStatusMessage.textContent = message || '';
+    chatStatusMessage.classList.toggle('error', isError);
+}
+
+function clearActiveSidebarState() {
+    document.querySelectorAll('.sidebar-chat-link').forEach((link) => {
+        link.classList.remove('current');
+    });
+}
+
+function addSessionToSidebar(sessionId, title, url) {
+    let existing = document.querySelector(`.sidebar-chat-link[data-session-id="${sessionId}"]`);
+    if (existing) {
+        clearActiveSidebarState();
+        existing.classList.add('current');
+        return;
+    }
+
+    const emptyState = document.querySelector('.sidebar-empty');
+    if (emptyState) {
+        emptyState.remove();
+    }
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.className = 'sidebar-chat-link current';
+    link.dataset.sessionId = sessionId;
+    link.innerHTML = `<i class="fas fa-comment-alt"></i><span>${title}</span>`;
+
+    const section = document.querySelector('.sidebar-section');
+    const firstLink = section.querySelector('.sidebar-chat-link');
+    clearActiveSidebarState();
+    if (firstLink) {
+        section.insertBefore(link, firstLink);
+    } else {
+        section.appendChild(link);
+    }
+}
+
+function resetToNewChat() {
+    currentSessionId = null;
+    chatStarted = false;
+    chatMessages.innerHTML = '';
+    welcomeScreen.style.display = 'flex';
+    activeChat.style.display = 'none';
+    chatSessionTitle.textContent = 'New chat';
+    setStatusMessage('');
+    clearActiveSidebarState();
+    history.replaceState({}, '', '{% url "chatbot_home" %}');
+}
+
 async function sendMessage(inputEl) {
     const message = inputEl.value.trim();
     if (!message) return;
 
-    // Switch to active chat layout
     switchToActiveChat();
-
-    // Show user message
+    setStatusMessage('');
     addMessage(message, 'user');
-    inputEl.value = '';
+    welcomeInput.value = '';
+    chatInputActive.value = '';
 
-    // Show typing indicator
     const typingDiv = addMessage('Thinking...', 'bot typing');
 
     try {
-        const response = await fetch('/chatbot/ask/', {
+        const response = await fetch('{% url "ask_gemini" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken(),
             },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify({
+                message,
+                session_id: currentSessionId,
+            }),
         });
 
         const data = await response.json();
-
-        // Remove typing indicator
         typingDiv.remove();
+
+        if (!response.ok) {
+            const errorMessage = data.error || 'Something went wrong. Please try again.';
+            setStatusMessage(errorMessage, true);
+            addMessage(errorMessage, 'bot error');
+            return;
+        }
 
         if (data.response) {
             addMessage(data.response, 'bot');
-        } else if (data.error) {
-            addMessage('Error: ' + data.error, 'bot error');
+
+            if (data.session_id) {
+                currentSessionId = data.session_id;
+                chatSessionTitle.textContent = data.session_title || 'Saved chat';
+                addSessionToSidebar(data.session_id, data.session_title || 'Saved chat', data.session_url);
+                if (data.session_url) {
+                    history.replaceState({}, '', data.session_url);
+                }
+            }
         }
     } catch (err) {
         typingDiv.remove();
+        setStatusMessage('Something went wrong. Please try again.', true);
         addMessage('Something went wrong. Please try again.', 'bot error');
     }
 }
 
-// Get CSRF token from cookies (Django requirement)
 function getCsrfToken() {
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
@@ -204,7 +293,6 @@ function getCsrfToken() {
     return '';
 }
 
-// --- Event Listeners for both inputs ---
 welcomeSendBtn.addEventListener('click', () => sendMessage(welcomeInput));
 welcomeInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage(welcomeInput);
@@ -215,8 +303,7 @@ chatInputActive.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage(chatInputActive);
 });
 
-// --- File Upload Script ---
-let uploadedFiles = [];
+newChatButton.addEventListener('click', resetToNewChat);
 
 function setupFileUpload(fileInputId, containerId) {
     document.getElementById(fileInputId).addEventListener('change', function(e) {
@@ -260,35 +347,12 @@ function removeFile(id) {
     }
 }
 
-// --- Sidebar Toggle Script ---
-const menuIcon = document.querySelector('.menu-icon');
-const sidebar = document.querySelector('.sidebar');
-const chatArea = document.querySelector('.chat-area');
-
 menuIcon.addEventListener('click', () => {
     sidebar.classList.toggle('hidden');
     chatArea.classList.toggle('full-width');
 });
 
-// --- Announcements Popup Script ---
-const notifIcon = document.querySelector('.notif-icon');
-const announcementsPopup = document.getElementById('announcementsPopup');
-
-if (notifIcon && announcementsPopup) {
-    notifIcon.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        announcementsPopup.style.display = announcementsPopup.style.display === 'block' ? 'none' : 'block';
-    });
-
-    document.addEventListener('click', (e) => {
-        if (announcementsPopup.style.display === 'block' && 
-            !notifIcon.contains(e.target) && 
-            !announcementsPopup.contains(e.target)) {
-            announcementsPopup.style.display = 'none';
-        }
-    });
-}
+renderSavedMessages();
 </script>
 
 <script src="{% static 'js/notifications.js' %}"></script>

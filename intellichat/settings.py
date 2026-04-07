@@ -145,3 +145,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # Login redirect
 LOGIN_URL = '/chatbot/login/'
+
+# Cache and chatbot controls
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'intellichat-default-cache',
+    }
+}
+
+CHAT_RATE_LIMIT = 20
+CHAT_RATE_LIMIT_WINDOW = 60
+CHAT_RESPONSE_CACHE_TTL = 300

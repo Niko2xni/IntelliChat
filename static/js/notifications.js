@@ -17,27 +17,34 @@ class NotificationSystem {
     }
 
     setupEventListeners() {
-        // Notification button click
         const notificationBtn = document.querySelector('.notification-btn');
+        const dropdown = document.getElementById('notificationDropdown');
+        const markAllReadBtn = document.getElementById('markAllReadBtn');
+
         if (notificationBtn) {
             notificationBtn.addEventListener('click', (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 this.toggleNotificationDropdown();
             });
         }
 
-        // Close dropdown when clicking outside
+        if (dropdown) {
+            dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         document.addEventListener('click', (e) => {
-            const dropdown = document.getElementById('notificationDropdown');
             if (dropdown && !dropdown.contains(e.target) && !e.target.closest('.notification-btn')) {
                 this.hideNotificationDropdown();
             }
         });
 
-        // Mark all as read button
-        const markAllReadBtn = document.getElementById('markAllReadBtn');
         if (markAllReadBtn) {
-            markAllReadBtn.addEventListener('click', () => {
+            markAllReadBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 this.markAllAsRead();
             });
         }
@@ -46,6 +53,9 @@ class NotificationSystem {
     async loadNotificationCount() {
         try {
             const response = await fetch(this.countUrl);
+            if (!response.ok) {
+                return;
+            }
             const data = await response.json();
             this.updateBadge(data.unread_count);
             this.unreadCount = data.unread_count;
@@ -57,6 +67,13 @@ class NotificationSystem {
     async loadNotifications() {
         try {
             const response = await fetch(this.notificationUrl);
+            if (!response.ok) {
+                this.notifications = [];
+                this.unreadCount = 0;
+                this.updateBadge(0);
+                this.renderNotifications();
+                return;
+            }
             const data = await response.json();
             this.notifications = data.notifications;
             this.unreadCount = data.unread_count;
@@ -95,7 +112,6 @@ class NotificationSystem {
         } else {
             notificationList.innerHTML = this.notifications.map(notif => this.renderNotificationItem(notif)).join('');
             
-            // Add click listeners to notification items
             notificationList.querySelectorAll('.notification-item').forEach(item => {
                 item.addEventListener('click', () => {
                     const notifId = item.dataset.notificationId;
@@ -103,7 +119,6 @@ class NotificationSystem {
                 });
             });
 
-            // Enhance admin notifications with response buttons
             if (window.location.pathname.includes('/dashboard/')) {
                 this.enhanceAdminNotifications();
             }
@@ -145,6 +160,7 @@ class NotificationSystem {
 
     async markAsRead(notificationId) {
         try {
+            const notif = this.notifications.find(n => n.id == notificationId);
             const url = this.markReadUrl.replace('{id}', notificationId);
             const response = await fetch(url, {
                 method: 'POST',
@@ -155,14 +171,11 @@ class NotificationSystem {
             });
 
             if (response.ok) {
-                // Remove notification from list
                 this.notifications = this.notifications.filter(n => n.id != notificationId);
-                this.unreadCount--;
+                this.unreadCount = Math.max(0, this.unreadCount - 1);
                 this.updateBadge(this.unreadCount);
                 this.renderNotifications();
                 
-                // Navigate to action URL if provided
-                const notif = this.notifications.find(n => n.id == notificationId);
                 if (notif && notif.action_url) {
                     window.location.href = notif.action_url;
                 }
@@ -210,6 +223,7 @@ class NotificationSystem {
         if (!dropdown) return;
 
         dropdown.style.display = 'block';
+        dropdown.classList.add('open');
         this.loadNotifications();
     }
 
@@ -217,6 +231,7 @@ class NotificationSystem {
         const dropdown = document.getElementById('notificationDropdown');
         if (dropdown) {
             dropdown.style.display = 'none';
+            dropdown.classList.remove('open');
         }
     }
 
@@ -232,15 +247,12 @@ class NotificationSystem {
     }
 
     startPolling() {
-        // Poll for new notifications every 30 seconds
         setInterval(() => {
             this.loadNotificationCount();
         }, 30000);
     }
 
-    // Static method to create notifications (for testing/demo)
     static createSampleNotifications() {
-        // This would typically be called from backend when events occur
         const sampleNotifications = [
             { title: 'New User Registration', message: 'A new user has registered on the platform', type: 'info' },
             { title: 'Document Uploaded', message: 'New document has been uploaded to knowledge base', type: 'success' },
@@ -250,7 +262,6 @@ class NotificationSystem {
         console.log('Sample notifications (for testing):', sampleNotifications);
     }
 
-    // Method to submit user requests to admin
     async submitUserRequest(requestType, details = '') {
         try {
             const response = await fetch('/dashboard/api/notifications/submit-request/', {
@@ -268,7 +279,7 @@ class NotificationSystem {
             const result = await response.json();
             if (result.status === 'success') {
                 this.showAlert('Request submitted successfully!', 'success');
-                this.loadNotificationCount(); // Refresh count
+                this.loadNotificationCount();
             } else {
                 this.showAlert(result.error || 'Failed to submit request', 'error');
             }
@@ -278,7 +289,6 @@ class NotificationSystem {
         }
     }
 
-    // Method for admin to respond to user requests
     async respondToUserRequest(notificationId, responseType, details = '') {
         try {
             const response = await fetch(`/dashboard/api/notifications/${notificationId}/respond/`, {
@@ -296,7 +306,7 @@ class NotificationSystem {
             const result = await response.json();
             if (result.status === 'success') {
                 this.showAlert(result.message, 'success');
-                this.loadNotifications(); // Refresh the list
+                this.loadNotifications();
             } else {
                 this.showAlert(result.error || 'Failed to send response', 'error');
             }
@@ -306,13 +316,10 @@ class NotificationSystem {
         }
     }
 
-    // Show alert messages
     showAlert(message, type = 'info') {
-        // Create a simple alert (could be enhanced with a toast notification)
         alert(message);
     }
 
-    // Add response buttons to admin notifications
     enhanceAdminNotifications() {
         const notificationItems = document.querySelectorAll('.notification-item[data-notification-id]');
         notificationItems.forEach(item => {

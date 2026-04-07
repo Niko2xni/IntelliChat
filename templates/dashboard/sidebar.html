@@ -7,45 +7,45 @@
             <span></span>
         </button>
     </div>
-    
+
     <nav class="sidebar-nav">
         <ul>
             <li>
-                <a href="{% url 'dashboard:index' %}" class="nav-item active">
-                    <span class="icon">📊</span>
+                <a href="{% url 'dashboard:index' %}" class="nav-item{% if request.resolver_match.url_name == 'index' %} active{% endif %}">
+                    <span class="icon"><i class="fas fa-chart-line"></i></span>
                     <span class="label">Dashboard</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'dashboard:knowledge_base' %}" class="nav-item">
-                    <span class="icon">📚</span>
+                <a href="{% url 'dashboard:knowledge_base' %}" class="nav-item{% if request.resolver_match.url_name == 'knowledge_base' %} active{% endif %}">
+                    <span class="icon"><i class="fas fa-book"></i></span>
                     <span class="label">Knowledge Base</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'dashboard:documents' %}" class="nav-item">
-                    <span class="icon">📄</span>
+                <a href="{% url 'dashboard:documents' %}" class="nav-item{% if request.resolver_match.url_name == 'documents' %} active{% endif %}">
+                    <span class="icon"><i class="fas fa-file-alt"></i></span>
                     <span class="label">Documents</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'dashboard:logging' %}" class="nav-item">
-                    <span class="icon">📝</span>
-                    <span class="label">Logging & Monitoring</span>
-                </a>
-            </li>
-            <li>
-                <a href="{% url 'dashboard:role_requests' %}" class="nav-item">
-                    <span class="icon">🎓</span>
+                <a href="{% url 'dashboard:role_requests' %}" class="nav-item{% if request.resolver_match.url_name == 'role_requests' %} active{% endif %}">
+                    <span class="icon"><i class="fas fa-user-check"></i></span>
                     <span class="label">Role Requests</span>
                 </a>
             </li>
             <li>
-                <a href="{% url 'dashboard:profile' %}" class="nav-item">
+                <a href="{% url 'dashboard:logging' %}" class="nav-item{% if request.resolver_match.url_name == 'logging' %} active{% endif %}">
+                    <span class="icon"><i class="fas fa-clipboard-list"></i></span>
+                    <span class="label">Logging & Monitoring</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'dashboard:profile' %}" class="nav-item{% if request.resolver_match.url_name == 'profile' %} active{% endif %}">
                     {% if user.is_authenticated and user.profile_picture %}
                     <img src="{{ user.profile_picture.url }}" alt="Profile" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; margin-right: 15px;">
                     {% else %}
-                    <span class="icon">👤</span>
+                    <span class="icon"><i class="fas fa-user"></i></span>
                     {% endif %}
                     <span class="label">Profile</span>
                 </a>
