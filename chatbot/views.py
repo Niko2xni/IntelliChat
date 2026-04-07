@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_http_methods
 from google import genai
 
 from .models import ChatMessage, ChatSession, Student
@@ -196,6 +197,25 @@ def _response_cache_key(user_message, history):
     return f"chat-response:{sha256(payload.encode('utf-8')).hexdigest()}"
 
 
+def _serialize_role_request(role_request):
+    if role_request is None:
+        return None
+
+    return {
+        'id': role_request.id,
+        'status': role_request.status,
+        'status_label': role_request.get_status_display(),
+        'student_number': role_request.student_number,
+        'position': role_request.position,
+        'organization': role_request.organization,
+        'requested_at': role_request.requested_at.isoformat(),
+        'requested_at_label': role_request.requested_at.strftime('%Y-%m-%d %H:%M'),
+        'reviewed_at': role_request.reviewed_at.isoformat() if role_request.reviewed_at else None,
+        'reviewed_at_label': role_request.reviewed_at.strftime('%Y-%m-%d %H:%M') if role_request.reviewed_at else None,
+        'reviewed_by': role_request.reviewed_by.email if role_request.reviewed_by else None,
+    }
+
+
 @ensure_csrf_cookie
 def chatbot_home(request, session_id=None):
     chat_sessions = _chat_sessions_for_user(request.user)
@@ -316,8 +336,15 @@ def logout_view(request):
 
 
 def profile_view(request):
+    latest_role_request = None
+    if request.user.is_authenticated:
+        latest_role_request = RoleRequest.objects.filter(
+            user=request.user,
+        ).select_related('reviewed_by').order_by('-requested_at').first()
+
     return render(request, 'chatbot/profile.html', {
         'chat_sessions': _chat_sessions_for_user(request.user),
+        'latest_role_request': latest_role_request,
     })
 
 
@@ -343,6 +370,20 @@ def submit_role_request(request):
         if not all([student_number, position, organization]):
             return JsonResponse({'success': False, 'error': 'All fields are required.'}, status=400)
 
+        existing_pending = RoleRequest.objects.filter(
+            user=request.user,
+            status=RoleRequest.STATUS_PENDING,
+        ).order_by('-requested_at').first()
+
+        if existing_pending:
+            return JsonResponse({
+                'success': True,
+                'already_pending': True,
+                'message': 'You already have a pending request under review.',
+                'request': _serialize_role_request(existing_pending),
+                'request_id': existing_pending.id,
+            })
+
         role_request = RoleRequest.objects.create(
             user=request.user,
             student_number=student_number,
@@ -355,11 +396,33 @@ def submit_role_request(request):
             f'Submitted role request for {organization} as {position}.',
         )
 
-        return JsonResponse({'success': True, 'request_id': role_request.id})
+        return JsonResponse({
+            'success': True,
+            'already_pending': False,
+            'message': 'Request submitted successfully and sent for admin review.',
+            'request': _serialize_role_request(role_request),
+            'request_id': role_request.id,
+        })
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'Invalid JSON in request body.'}, status=400)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def my_role_request_status(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+
+    latest_request = RoleRequest.objects.filter(
+        user=request.user,
+    ).select_related('reviewed_by').order_by('-requested_at').first()
+
+    return JsonResponse({
+        'success': True,
+        'has_request': latest_request is not None,
+        'request': _serialize_role_request(latest_request),
+    })
 
 
 def ask_gemini(request):

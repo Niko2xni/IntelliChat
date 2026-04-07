@@ -10,6 +10,7 @@ urlpatterns = [
     path('profile/', views.profile_view, name='profile'),
     path('request/', views.request_form_view, name='request_form'),
     path('submit-role-request/', views.submit_role_request, name='submit_role_request'),
+    path('my-role-request-status/', views.my_role_request_status, name='my_role_request_status'),
     path('ask/', views.ask_gemini, name='ask_gemini'),
     path('send-otp/', views.send_otp, name='send_otp'),
     path('verify-otp/', views.verify_otp, name='verify_otp'),

@@ -170,6 +170,34 @@ General
 </div>
 </div>
 
+<div class="settings-row" style="margin-top: 20px;">
+<div class="settings-box">
+<label>Student Leader Request</label>
+<div class="settings-input" id="roleRequestStatusBox">
+<span id="roleRequestStatusText">
+{% if latest_role_request %}
+{{ latest_role_request.get_status_display }} - {{ latest_role_request.organization }} ({{ latest_role_request.position }})
+{% else %}
+No request submitted yet
+{% endif %}
+</span>
+</div>
+<div id="roleRequestMeta" style="margin-top: 8px; font-size: 12px; color: #666; line-height: 1.4;">
+{% if latest_role_request %}
+Requested {{ latest_role_request.requested_at|date:"Y-m-d H:i" }}
+{% if latest_role_request.reviewed_at %}
+ • Reviewed {{ latest_role_request.reviewed_at|date:"Y-m-d H:i" }}
+{% endif %}
+{% else %}
+Use "Contact admin" to submit your request.
+{% endif %}
+</div>
+{% if user.is_staff %}
+<a href="{% url 'dashboard:role_requests' %}" class="small-link" style="margin-top: 8px; display: inline-block;">Open dashboard role requests</a>
+{% endif %}
+</div>
+</div>
+
 {% endif %}
 
 <div class="profile-actions" style="align-items: center; gap: 20px;">
@@ -469,10 +497,14 @@ function submitRoleRequest() {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                btn.innerText = "Request Sent!";
+                btn.innerText = data.already_pending ? "Already Pending" : "Request Sent!";
+                if (data.message) {
+                    alert(data.message);
+                }
                 setTimeout(() => {
                     closeModal('contactAdminModal');
                     form.reset();
+                    refreshRoleRequestStatus();
                 }, 1200);
             } else {
                 alert(data.error || "Failed to submit request.");
@@ -617,6 +649,48 @@ function sendPwdOtp(btn) {
     .finally(() => {
         btn.disabled = false;
         btn.innerText = "Send Verification Code";
+    });
+}
+
+function renderRoleRequestStatus(statusResponse) {
+    const statusText = document.getElementById("roleRequestStatusText");
+    const statusMeta = document.getElementById("roleRequestMeta");
+
+    if (!statusText || !statusMeta) {
+        return;
+    }
+
+    if (!statusResponse.has_request || !statusResponse.request) {
+        statusText.innerText = "No request submitted yet";
+        statusMeta.innerText = "Use \"Contact admin\" to submit your request.";
+        return;
+    }
+
+    const req = statusResponse.request;
+    statusText.innerText = `${req.status_label} - ${req.organization} (${req.position})`;
+
+    let meta = `Requested ${req.requested_at_label}`;
+    if (req.reviewed_at_label) {
+        meta += ` • Reviewed ${req.reviewed_at_label}`;
+    }
+    statusMeta.innerText = meta;
+}
+
+function refreshRoleRequestStatus() {
+    fetch("{% url 'my_role_request_status' %}", {
+        method: "GET",
+        headers: {
+            "X-CSRFToken": getCookie('csrftoken')
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            renderRoleRequestStatus(data);
+        }
+    })
+    .catch(() => {
+        // Keep current UI state if refresh fails.
     });
 }
 
@@ -873,6 +947,7 @@ function confirmChangeEmail(btn) {
     // Test notification system on profile page load
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Profile page loaded - checking notification system...');
+        refreshRoleRequestStatus();
         
         // Check if notification system is initialized
         if (typeof window.notificationSystem !== 'undefined') {

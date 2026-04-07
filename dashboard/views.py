@@ -666,6 +666,12 @@ def manage_role_request(request, req_id):
     except RoleRequest.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Request not found'}, status=404)
 
+    if role_request.status != RoleRequest.STATUS_PENDING:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'This request is already {role_request.status}.',
+        }, status=400)
+
     role_request.status = RoleRequest.STATUS_ACCEPTED if action == 'accept' else RoleRequest.STATUS_REJECTED
     role_request.reviewed_at = timezone.now()
     role_request.reviewed_by = request.user
