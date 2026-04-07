@@ -113,7 +113,10 @@ class NotificationSystem {
             notificationList.innerHTML = this.notifications.map(notif => this.renderNotificationItem(notif)).join('');
             
             notificationList.querySelectorAll('.notification-item').forEach(item => {
-                item.addEventListener('click', () => {
+                item.addEventListener('click', (event) => {
+                    if (event.target.closest('.notification-action') || event.target.closest('.response-btn')) {
+                        return;
+                    }
                     const notifId = item.dataset.notificationId;
                     this.markAsRead(notifId);
                 });
@@ -128,9 +131,10 @@ class NotificationSystem {
     renderNotificationItem(notif) {
         const typeClass = `notification-${notif.type}`;
         const timeAgo = this.getTimeAgo(notif.created_at);
+        const canRespond = notif.can_respond ? '1' : '0';
         
         return `
-            <div class="notification-item ${typeClass}" data-notification-id="${notif.id}">
+            <div class="notification-item ${typeClass}" data-notification-id="${notif.id}" data-can-respond="${canRespond}">
                 <div class="notification-content">
                     <h4>${notif.title}</h4>
                     <p>${notif.message}</p>
@@ -323,6 +327,10 @@ class NotificationSystem {
     enhanceAdminNotifications() {
         const notificationItems = document.querySelectorAll('.notification-item[data-notification-id]');
         notificationItems.forEach(item => {
+            if (item.dataset.canRespond !== '1') {
+                return;
+            }
+
             const notificationId = item.dataset.notificationId;
             const actionsDiv = item.querySelector('.notification-actions');
             

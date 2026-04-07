@@ -153,6 +153,51 @@ class RoleRequest(models.Model):
         return f"{self.user.email} - {self.organization} ({self.status})"
 
 
+class Notification(models.Model):
+    TYPE_INFO = 'info'
+    TYPE_SUCCESS = 'success'
+    TYPE_WARNING = 'warning'
+    TYPE_ERROR = 'error'
+    TYPE_CHOICES = [
+        (TYPE_INFO, 'Info'),
+        (TYPE_SUCCESS, 'Success'),
+        (TYPE_WARNING, 'Warning'),
+        (TYPE_ERROR, 'Error'),
+    ]
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='requested_notifications',
+    )
+    role_request = models.ForeignKey(
+        'RoleRequest',
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name='notifications',
+    )
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_INFO)
+    action_url = models.CharField(max_length=255, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.title} -> {self.recipient.email}"
+
+
 class AuditLog(models.Model):
     action = models.CharField(max_length=120)
     actor_email = models.EmailField()
@@ -164,6 +209,26 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.action} - {self.actor_email}"
+
+
+def create_notification(
+    recipient,
+    title,
+    message,
+    notif_type=Notification.TYPE_INFO,
+    action_url='',
+    requester=None,
+    role_request=None,
+):
+    return Notification.objects.create(
+        recipient=recipient,
+        requester=requester,
+        role_request=role_request,
+        title=title,
+        message=message,
+        type=notif_type,
+        action_url=action_url,
+    )
 
 
 def create_audit_log(action, actor_email, details=''):

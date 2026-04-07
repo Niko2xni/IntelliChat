@@ -16,7 +16,7 @@ from django.views.decorators.http import require_http_methods
 from google import genai
 
 from .models import ChatMessage, ChatSession, Student
-from dashboard.models import RoleRequest, create_audit_log
+from dashboard.models import Notification, RoleRequest, create_audit_log, create_notification
 
 SYSTEM_PROMPT = """
 You are the T.I.P. Office of Student Affairs (OSA) Virtual Assistant.
@@ -419,6 +419,37 @@ def submit_role_request(request):
             'Submitted Student Leader request',
             request.user.email,
             f'Submitted role request for {organization} as {position}.',
+        )
+
+        requester_display = request.user.get_full_name() or request.user.username or request.user.email
+        admin_message = (
+            f'{requester_display} submitted a Student Leader role request '
+            f'for {organization} as {position}.'
+        )
+        admin_users = Student.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+        admin_notifications = [
+            Notification(
+                recipient=admin,
+                requester=request.user,
+                role_request=role_request,
+                title='New role request submitted',
+                message=admin_message,
+                type=Notification.TYPE_INFO,
+                action_url='/dashboard/role-requests/',
+            )
+            for admin in admin_users
+        ]
+        if admin_notifications:
+            Notification.objects.bulk_create(admin_notifications)
+
+        create_notification(
+            recipient=request.user,
+            requester=request.user,
+            role_request=role_request,
+            title='Role request submitted',
+            message='Your Student Leader role request has been submitted and is now under admin review.',
+            notif_type=Notification.TYPE_SUCCESS,
+            action_url='/chatbot/profile/',
         )
 
         return JsonResponse({

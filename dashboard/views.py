@@ -11,9 +11,11 @@ from .models import (
     DashboardMetrics,
     Document,
     FAQ,
+    Notification,
     ResponseTimeData,
     RoleRequest,
     create_audit_log,
+    create_notification,
 )
 import json
 
@@ -442,33 +444,23 @@ def logging_monitoring(request):
     return render(request, 'dashboard/logging.html', {'logs': logs})
 
 
-def _get_session_notifications(request):
-    notifications = request.session.get('ui_notifications', [])
-    if isinstance(notifications, list):
-        return notifications
-    return []
+def _serialize_notification(notification):
+    can_respond = bool(notification.requester_id and notification.role_request_id is None)
+    return {
+        'id': notification.id,
+        'title': notification.title or 'Notification',
+        'message': notification.message or '',
+        'type': notification.type or Notification.TYPE_INFO,
+        'created_at': notification.created_at.isoformat(),
+        'action_url': notification.action_url or '',
+        'can_respond': can_respond,
+    }
 
 
-def _save_session_notifications(request, notifications):
-    request.session['ui_notifications'] = notifications
-    request.session.modified = True
-
-
-def _next_notification_id(notifications):
-    if not notifications:
-        return 1
-    return max(item.get('id', 0) for item in notifications) + 1
-
-
-def _visible_notifications_for_user(request, notifications):
-    if not request.user.is_authenticated:
-        return []
-
-    if request.user.is_staff:
-        return notifications
-
-    user_email = request.user.email
-    return [item for item in notifications if item.get('user_email') == user_email]
+def _notification_queryset_for_user(user):
+    if not user.is_authenticated:
+        return Notification.objects.none()
+    return Notification.objects.filter(recipient=user)
 
 
 @require_http_methods(["GET"])
@@ -477,23 +469,11 @@ def get_notifications(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
-    notifications = _get_session_notifications(request)
-    visible = _visible_notifications_for_user(request, notifications)
-    unread = [item for item in visible if not item.get('is_read', False)]
-    unread.sort(key=lambda item: item.get('created_at', ''), reverse=True)
+    unread = _notification_queryset_for_user(request.user).filter(is_read=False).order_by('-created_at')
+    unread_count = unread.count()
+    payload = [_serialize_notification(item) for item in unread[:10]]
 
-    payload = []
-    for item in unread[:10]:
-        payload.append({
-            'id': item.get('id'),
-            'title': item.get('title', 'Notification'),
-            'message': item.get('message', ''),
-            'type': item.get('type', 'info'),
-            'created_at': item.get('created_at'),
-            'action_url': item.get('action_url', ''),
-        })
-
-    return JsonResponse({'notifications': payload, 'unread_count': len(payload)})
+    return JsonResponse({'notifications': payload, 'unread_count': unread_count})
 
 
 @require_http_methods(["POST"])
@@ -502,20 +482,17 @@ def mark_notification_read(request, notification_id):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
-    notifications = _get_session_notifications(request)
-    for item in notifications:
-        if item.get('id') != notification_id:
-            continue
+    try:
+        notification = _notification_queryset_for_user(request.user).get(id=notification_id)
+    except Notification.DoesNotExist:
+        return JsonResponse({'error': 'Notification not found'}, status=404)
 
-        target_email = item.get('user_email')
-        if not request.user.is_staff and target_email != request.user.email:
-            return JsonResponse({'error': 'Permission denied'}, status=403)
+    if notification.is_read:
+        return JsonResponse({'status': 'success', 'message': 'Notification already marked as read'})
 
-        item['is_read'] = True
-        _save_session_notifications(request, notifications)
-        return JsonResponse({'status': 'success', 'message': 'Notification marked as read'})
-
-    return JsonResponse({'error': 'Notification not found'}, status=404)
+    notification.is_read = True
+    notification.save(update_fields=['is_read'])
+    return JsonResponse({'status': 'success', 'message': 'Notification marked as read'})
 
 
 @require_http_methods(["POST"])
@@ -524,16 +501,7 @@ def mark_all_notifications_read(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
 
-    notifications = _get_session_notifications(request)
-    updated = 0
-
-    for item in notifications:
-        if request.user.is_staff or item.get('user_email') == request.user.email:
-            if not item.get('is_read', False):
-                item['is_read'] = True
-                updated += 1
-
-    _save_session_notifications(request, notifications)
+    updated = _notification_queryset_for_user(request.user).filter(is_read=False).update(is_read=True)
 
     return JsonResponse({
         'status': 'success',
@@ -546,9 +514,7 @@ def get_notification_count(request):
     if not request.user.is_authenticated:
         return JsonResponse({'unread_count': 0})
 
-    notifications = _get_session_notifications(request)
-    visible = _visible_notifications_for_user(request, notifications)
-    unread_count = len([item for item in visible if not item.get('is_read', False)])
+    unread_count = _notification_queryset_for_user(request.user).filter(is_read=False).count()
 
     return JsonResponse({'unread_count': unread_count})
 
@@ -567,34 +533,36 @@ def submit_user_request(request):
     request_type = data.get('type', 'other')
     details = data.get('details', '').strip()
 
-    notifications = _get_session_notifications(request)
-    now_iso = timezone.now().isoformat()
-    next_id = _next_notification_id(notifications)
+    requester_display = request.user.get_full_name() or request.user.username or request.user.email
+    request_type_label = request_type.replace('_', ' ').title()
+    admin_message = (
+        f"{requester_display} submitted a {request_type_label.lower()} request. {details}"
+    ).strip()
 
-    notifications.append({
-        'id': next_id,
-        'title': f"{request_type.replace('_', ' ').title()} Request",
-        'message': f"{request.user.get_full_name() or request.user.username} submitted a request. {details}".strip(),
-        'type': 'info',
-        'created_at': now_iso,
-        'action_url': '/dashboard/role-requests/',
-        'is_read': False,
-        'user_email': None,
-        'requester_email': request.user.email,
-    })
+    admin_users = request.user.__class__.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+    admin_notifications = [
+        Notification(
+            recipient=admin,
+            requester=request.user,
+            title=f'{request_type_label} Request',
+            message=admin_message,
+            type=Notification.TYPE_INFO,
+            action_url='/dashboard/role-requests/',
+        )
+        for admin in admin_users
+    ]
+    if admin_notifications:
+        Notification.objects.bulk_create(admin_notifications)
 
-    notifications.append({
-        'id': next_id + 1,
-        'title': 'Request Submitted',
-        'message': f"Your {request_type.replace('_', ' ')} request has been submitted.",
-        'type': 'success',
-        'created_at': now_iso,
-        'action_url': '/chatbot/profile/',
-        'is_read': False,
-        'user_email': request.user.email,
-    })
+    create_notification(
+        recipient=request.user,
+        requester=request.user,
+        title='Request Submitted',
+        message=f'Your {request_type.replace("_", " ")} request has been submitted for admin review.',
+        notif_type=Notification.TYPE_SUCCESS,
+        action_url='/chatbot/profile/',
+    )
 
-    _save_session_notifications(request, notifications)
     return JsonResponse({'status': 'success', 'message': 'Request submitted successfully'})
 
 
@@ -612,35 +580,31 @@ def respond_to_user_request(request, notification_id):
     response_type = data.get('response_type', 'info')
     details = data.get('details', '').strip()
 
-    notifications = _get_session_notifications(request)
-    original = None
-
-    for item in notifications:
-        if item.get('id') == notification_id:
-            original = item
-            break
-
-    if original is None:
+    try:
+        original = Notification.objects.select_related('requester').get(
+            id=notification_id,
+            recipient=request.user,
+        )
+    except Notification.DoesNotExist:
         return JsonResponse({'error': 'Notification not found'}, status=404)
 
-    requester_email = original.get('requester_email') or original.get('user_email')
-    if not requester_email:
+    requester = original.requester
+    if requester is None:
         return JsonResponse({'error': 'No requester found for this notification'}, status=400)
 
-    original['is_read'] = True
+    original.is_read = True
+    original.save(update_fields=['is_read'])
 
-    notifications.append({
-        'id': _next_notification_id(notifications),
-        'title': 'Admin Response',
-        'message': f"Your request was marked as {response_type}. {details}".strip(),
-        'type': 'success' if response_type == 'approved' else 'warning',
-        'created_at': timezone.now().isoformat(),
-        'action_url': '/chatbot/profile/',
-        'is_read': False,
-        'user_email': requester_email,
-    })
+    notif_type = Notification.TYPE_SUCCESS if response_type == 'approved' else Notification.TYPE_WARNING
+    create_notification(
+        recipient=requester,
+        requester=request.user,
+        title='Admin Response',
+        message=f'Your request was marked as {response_type}. {details}'.strip(),
+        notif_type=notif_type,
+        action_url='/chatbot/profile/',
+    )
 
-    _save_session_notifications(request, notifications)
     return JsonResponse({'status': 'success', 'message': 'Response sent successfully'})
 
 
@@ -691,6 +655,27 @@ def manage_role_request(request, req_id):
         request.user.email,
         f'{action.title()}ed role request for {role_request.user.email} ({role_request.organization} - {role_request.position}).',
     )
+
+    decision_word = 'approved' if action == 'accept' else 'rejected'
+    notification_type = Notification.TYPE_SUCCESS if action == 'accept' else Notification.TYPE_WARNING
+    create_notification(
+        recipient=role_request.user,
+        requester=request.user,
+        role_request=role_request,
+        title=f'Role request {decision_word}',
+        message=(
+            f'Your Student Leader request for {role_request.organization} ({role_request.position}) '
+            f'was {decision_word} by admin.'
+        ),
+        notif_type=notification_type,
+        action_url='/chatbot/profile/',
+    )
+
+    Notification.objects.filter(
+        role_request=role_request,
+        recipient=request.user,
+        is_read=False,
+    ).update(is_read=True)
 
     return JsonResponse({'status': 'success', 'message': f'Request {action}ed successfully.'})
 
