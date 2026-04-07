@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/delete-faq/<int:faq_id>/', views.delete_faq, name='delete_faq'),
     path('documents/', views.documents, name='documents'),
     path('api/search-documents/', views.search_documents, name='search_documents'),
+    path('api/document/<int:doc_id>/', views.get_document_detail, name='get_document_detail'),
     path('api/upload-document/', views.upload_document, name='upload_document'),
     path('api/update-document/<int:doc_id>/', views.update_document, name='update_document'),
     path('api/delete-document/<int:doc_id>/', views.delete_document, name='delete_document'),

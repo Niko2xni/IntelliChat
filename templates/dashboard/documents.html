@@ -257,8 +257,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const editForm = document.getElementById('editForm');
     const docFile = document.getElementById('docFile');
     const editDocFile = document.getElementById('editDocFile');
+    const previewDownloadBtn = document.getElementById('downloadPreviewBtn');
 
     let currentDocId = null;
+
+    async function fetchDocumentDetail(docId, trackView = false) {
+        const suffix = trackView ? '?track_view=1' : '';
+        const response = await fetch(`/dashboard/api/document/${docId}/${suffix}`);
+        const result = await response.json();
+
+        if (!response.ok || result.status !== 'success') {
+            throw new Error(result.message || 'Failed to load document details.');
+        }
+
+        return result.document;
+    }
 
     // Search functionality
     function performSearch() {
@@ -339,49 +352,68 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Handle view button
-    function handleView(e) {
-        const docItem = e.target.closest('.document-item');
+    async function handleView(e) {
+        const docItem = e.currentTarget.closest('.document-item');
+        if (!docItem) {
+            return;
+        }
+
         const docId = docItem.dataset.id;
-        const docTitle = docItem.querySelector('.doc-title').textContent;
-        const docType = docItem.querySelector('.doc-type').textContent;
-        const docSize = docItem.querySelector('.doc-size').textContent;
-        const docCategory = docItem.querySelector('.status-badge').textContent.split(' ')[0].toLowerCase();
-        const downloadCount = docItem.querySelector('.download-count').textContent;
 
-        document.getElementById('previewTitle').textContent = docTitle;
-        document.getElementById('previewType').textContent = docType;
-        document.getElementById('previewSize').textContent = docSize;
-        document.getElementById('previewCategory').textContent = docCategory;
-        document.getElementById('previewDownloads').textContent = downloadCount;
-        document.getElementById('downloadPreviewBtn').dataset.id = docId;
+        try {
+            const doc = await fetchDocumentDetail(docId, true);
 
-        previewModal.style.display = 'block';
+            document.getElementById('previewTitle').textContent = doc.title;
+            document.getElementById('previewType').textContent = doc.file_type;
+            document.getElementById('previewSize').textContent = doc.file_size_display;
+            document.getElementById('previewCategory').textContent = doc.category_label;
+            document.getElementById('previewDownloads').textContent = `${doc.download_count} downloads`;
+            if (previewDownloadBtn) {
+                previewDownloadBtn.dataset.id = doc.id;
+            }
+
+            previewModal.style.display = 'block';
+            performSearch();
+        } catch (error) {
+            showNotification(error.message || 'Failed to load document preview.', 'error');
+        }
     }
 
     // Handle edit button
-    function handleEdit(e) {
-        const docItem = e.target.closest('.document-item');
+    async function handleEdit(e) {
+        const docItem = e.currentTarget.closest('.document-item');
+        if (!docItem) {
+            return;
+        }
+
         currentDocId = docItem.dataset.id;
-        const docTitle = docItem.querySelector('.doc-title').textContent;
-        const statusBadge = docItem.querySelector('.status-badge').className;
-        // fallback in case of classes being dynamically changed but structurally it matches
-        const docCategory = docItem.querySelector('.status-badge').textContent.split(' ')[0].toLowerCase();
-        
-        document.getElementById('editDocName').value = docTitle;
-        // Note: the category rendered under status-badge might actually be the status or category based on structure. 
-        // In the HTML: \`<span class="status-badge status-${doc.status}">\` indicates status. 
-        // To properly get category without storing in dataset, we should rely on backend API. 
-        // For simplicity, we can load it from text if provided, or set dummy. 
-        // We will reset the file text.
-        document.getElementById('editFileAreaP').textContent = "Click to upload or drag and drop to replace";
-        document.getElementById('editDocFile').value = '';
-        editModal.style.display = 'block';
+
+        try {
+            const doc = await fetchDocumentDetail(currentDocId, false);
+            document.getElementById('editDocName').value = doc.title;
+            document.getElementById('editDocCategory').value = doc.category;
+            document.getElementById('editFileAreaP').textContent = "Click to upload or drag and drop to replace";
+            document.getElementById('editDocFile').value = '';
+            editModal.style.display = 'block';
+        } catch (error) {
+            showNotification(error.message || 'Failed to load document details.', 'error');
+        }
     }
 
     // Handle download button
     function handleDownload(e) {
         let docId = e.currentTarget.dataset.id;
         window.location.href = '/dashboard/api/download-document/' + docId;
+    }
+
+    if (previewDownloadBtn) {
+        previewDownloadBtn.addEventListener('click', function() {
+            const docId = this.dataset.id;
+            if (!docId) {
+                return;
+            }
+            window.location.href = '/dashboard/api/download-document/' + docId;
+        });
     }
 
     // Handle delete button

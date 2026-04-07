@@ -429,6 +429,45 @@ def download_document(request, doc_id):
         raise Http404("Document not found.")
 
 
+@user_passes_test(is_admin, login_url='login')
+@require_http_methods(["GET"])
+def get_document_detail(request, doc_id):
+    """API endpoint to fetch a single document's details."""
+    try:
+        doc = Document.objects.get(id=doc_id)
+    except Document.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Document not found'}, status=404)
+
+    should_track_view = request.GET.get('track_view', '').lower() in ['1', 'true', 'yes']
+    if should_track_view:
+        Document.objects.filter(id=doc.id).update(view_count=models.F('view_count') + 1)
+        doc.refresh_from_db(fields=['view_count'])
+
+    file_name = doc.file.name.split('/')[-1] if doc.file else ''
+
+    return JsonResponse({
+        'status': 'success',
+        'document': {
+            'id': doc.id,
+            'title': doc.title,
+            'description': doc.description,
+            'file_type': doc.file_type,
+            'file_size': doc.file_size,
+            'file_size_display': format_file_size(doc.file_size),
+            'file_name': file_name,
+            'category': doc.category,
+            'category_label': dict(Document.CATEGORY_CHOICES).get(doc.category, doc.category),
+            'status': doc.status,
+            'status_label': dict(Document.STATUS_CHOICES).get(doc.status, doc.status),
+            'download_count': doc.download_count,
+            'view_count': doc.view_count,
+            'created_at': doc.created_at.strftime('%b %d, %Y'),
+            'updated_at': doc.updated_at.strftime('%b %d, %Y'),
+            'download_url': f'/dashboard/api/download-document/{doc.id}/',
+        },
+    })
+
+
 def format_file_size(bytes_size):
     """Convert bytes to human-readable format."""
     for unit in ['B', 'KB', 'MB', 'GB']:
