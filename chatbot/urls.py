@@ -20,6 +20,4 @@ urlpatterns = [
     path('init-delete-account/', views.init_delete_account, name='init_delete_account'),
     path('confirm-delete-account/', views.confirm_delete_account, name='confirm_delete_account'),
     path('upload-profile-picture/', views.upload_profile_picture, name='upload_profile_picture'),
-    path('init-change-email/', views.init_change_email, name='init_change_email'),
-    path('confirm-change-email/', views.confirm_change_email, name='confirm_change_email'),
 ]
