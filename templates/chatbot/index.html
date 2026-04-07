@@ -57,21 +57,33 @@
         </div>
 
         <div class="sidebar-section">
-            <div class="sidebar-section-title">Recent chats</div>
+            <div class="sidebar-section-header">
+                <div class="sidebar-section-title">Recent chats</div>
+                {% if user.is_authenticated %}
+                <span class="sidebar-session-count">{{ chat_session_summaries|length }}</span>
+                {% endif %}
+            </div>
 
             {% if user.is_authenticated %}
-                {% for session in chat_sessions %}
+                <div class="sidebar-chat-list">
+                {% for session in chat_session_summaries %}
                 <a
                     href="{% url 'chat_session' session.id %}"
                     class="sidebar-chat-link{% if current_session and current_session.id == session.id %} current{% endif %}"
                     data-session-id="{{ session.id }}"
                 >
-                    <i class="fas fa-comment-alt"></i>
-                    <span>{{ session.title }}</span>
+                    <div class="sidebar-chat-main">
+                        <div class="sidebar-chat-title-row">
+                            <span class="sidebar-chat-title">{{ session.title }}</span>
+                            <time class="sidebar-chat-time" datetime="{{ session.updated_iso }}">{{ session.updated_label }}</time>
+                        </div>
+                        <p class="sidebar-chat-preview">{{ session.preview }}</p>
+                    </div>
                 </a>
                 {% empty %}
                 <div class="sidebar-empty">No saved chats yet.</div>
                 {% endfor %}
+                </div>
             {% else %}
             <div class="sidebar-empty">Log in to save your chat sessions.</div>
             {% endif %}
@@ -111,6 +123,13 @@
                     New chat
                     {% endif %}
                 </h2>
+                <p class="chat-session-meta" id="chatSessionMeta">
+                    {% if current_messages %}
+                    {{ current_messages|length }} messages in this chat
+                    {% else %}
+                    No messages yet
+                    {% endif %}
+                </p>
             </div>
 
             <div class="chat-messages" id="chatMessages"></div>
@@ -147,11 +166,15 @@ const sidebar = document.querySelector('.sidebar');
 const chatArea = document.querySelector('.chat-area');
 const newChatButton = document.getElementById('newChatButton');
 const chatSessionTitle = document.getElementById('chatSessionTitle');
+const chatSessionMeta = document.getElementById('chatSessionMeta');
 const chatStatusMessage = document.getElementById('chatStatusMessage');
+const chatListContainer = document.querySelector('.sidebar-chat-list');
+const sessionCountBadge = document.querySelector('.sidebar-session-count');
 
 let chatStarted = {% if current_session %}true{% else %}false{% endif %};
 let currentSessionId = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
 let uploadedFiles = [];
+let messageCount = 0;
 
 function switchToActiveChat() {
     if (!chatStarted) {
@@ -162,20 +185,78 @@ function switchToActiveChat() {
     chatInputActive.focus();
 }
 
-function addMessage(text, sender) {
+function formatTimeLabel(dateValue) {
+    return dateValue.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function escapeHtml(value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function truncateText(text, maxLength = 80) {
+    if (text.length <= maxLength) {
+        return text;
+    }
+    return `${text.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function updateSessionMeta() {
+    if (!chatSessionMeta) {
+        return;
+    }
+
+    if (messageCount === 0) {
+        chatSessionMeta.textContent = 'No messages yet';
+        return;
+    }
+
+    const noun = messageCount === 1 ? 'message' : 'messages';
+    chatSessionMeta.textContent = `${messageCount} ${noun} in this chat`;
+}
+
+function addMessage(text, sender, timeLabel = null) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-bubble ${sender}`;
-    msgDiv.textContent = text;
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'chat-bubble-content';
+    contentDiv.textContent = text;
+    msgDiv.appendChild(contentDiv);
+
+    if (timeLabel) {
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'chat-bubble-time';
+        timeDiv.textContent = timeLabel;
+        msgDiv.appendChild(timeDiv);
+    }
+
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    if (!sender.includes('typing')) {
+        messageCount += 1;
+        updateSessionMeta();
+    }
+
     return msgDiv;
 }
 
 function renderSavedMessages() {
     const saved = JSON.parse(document.getElementById('initial-chat-messages').textContent);
+    messageCount = 0;
     saved.forEach((message) => {
-        addMessage(message.content, message.role === 'user' ? 'user' : 'bot');
+        addMessage(
+            message.content,
+            message.role === 'user' ? 'user' : 'bot',
+            message.time_label || null,
+        );
     });
+    updateSessionMeta();
 }
 
 function setStatusMessage(message, isError = false) {
@@ -189,11 +270,29 @@ function clearActiveSidebarState() {
     });
 }
 
-function addSessionToSidebar(sessionId, title, url) {
+function addSessionToSidebar(sessionId, title, url, latestPreview = '') {
     let existing = document.querySelector(`.sidebar-chat-link[data-session-id="${sessionId}"]`);
+
+    const safeTitle = escapeHtml(title || 'Saved chat');
+    const cleanPreview = truncateText((latestPreview || '').trim() || 'New conversation started.');
+    const safePreview = escapeHtml(cleanPreview);
+    const nowLabel = formatTimeLabel(new Date());
+
     if (existing) {
+        existing.querySelector('.sidebar-chat-title').textContent = title || 'Saved chat';
+        const existingPreview = existing.querySelector('.sidebar-chat-preview');
+        if (existingPreview && cleanPreview) {
+            existingPreview.textContent = cleanPreview;
+        }
+        const existingTime = existing.querySelector('.sidebar-chat-time');
+        if (existingTime) {
+            existingTime.textContent = nowLabel;
+            existingTime.dateTime = new Date().toISOString();
+        }
+
         clearActiveSidebarState();
         existing.classList.add('current');
+        existing.parentElement.prepend(existing);
         return;
     }
 
@@ -206,25 +305,40 @@ function addSessionToSidebar(sessionId, title, url) {
     link.href = url;
     link.className = 'sidebar-chat-link current';
     link.dataset.sessionId = sessionId;
-    link.innerHTML = `<i class="fas fa-comment-alt"></i><span>${title}</span>`;
+    link.innerHTML = `
+        <div class="sidebar-chat-main">
+            <div class="sidebar-chat-title-row">
+                <span class="sidebar-chat-title">${safeTitle}</span>
+                <time class="sidebar-chat-time" datetime="${new Date().toISOString()}">${nowLabel}</time>
+            </div>
+            <p class="sidebar-chat-preview">${safePreview}</p>
+        </div>
+    `;
 
-    const section = document.querySelector('.sidebar-section');
-    const firstLink = section.querySelector('.sidebar-chat-link');
+    const list = chatListContainer || document.querySelector('.sidebar-chat-list') || document.querySelector('.sidebar-section');
+    const firstLink = list.querySelector('.sidebar-chat-link');
     clearActiveSidebarState();
     if (firstLink) {
-        section.insertBefore(link, firstLink);
+        list.insertBefore(link, firstLink);
     } else {
-        section.appendChild(link);
+        list.appendChild(link);
+    }
+
+    if (sessionCountBadge) {
+        const currentCount = Number.parseInt(sessionCountBadge.textContent || '0', 10);
+        sessionCountBadge.textContent = Number.isNaN(currentCount) ? '1' : String(currentCount + 1);
     }
 }
 
 function resetToNewChat() {
     currentSessionId = null;
     chatStarted = false;
+    messageCount = 0;
     chatMessages.innerHTML = '';
     welcomeScreen.style.display = 'flex';
     activeChat.style.display = 'none';
     chatSessionTitle.textContent = 'New chat';
+    updateSessionMeta();
     setStatusMessage('');
     clearActiveSidebarState();
     history.replaceState({}, '', '{% url "chatbot_home" %}');
@@ -236,7 +350,7 @@ async function sendMessage(inputEl) {
 
     switchToActiveChat();
     setStatusMessage('');
-    addMessage(message, 'user');
+    addMessage(message, 'user', formatTimeLabel(new Date()));
     welcomeInput.value = '';
     chatInputActive.value = '';
 
@@ -261,17 +375,17 @@ async function sendMessage(inputEl) {
         if (!response.ok) {
             const errorMessage = data.error || 'Something went wrong. Please try again.';
             setStatusMessage(errorMessage, true);
-            addMessage(errorMessage, 'bot error');
+            addMessage(errorMessage, 'bot error', formatTimeLabel(new Date()));
             return;
         }
 
         if (data.response) {
-            addMessage(data.response, 'bot');
+            addMessage(data.response, 'bot', formatTimeLabel(new Date()));
 
             if (data.session_id) {
                 currentSessionId = data.session_id;
                 chatSessionTitle.textContent = data.session_title || 'Saved chat';
-                addSessionToSidebar(data.session_id, data.session_title || 'Saved chat', data.session_url);
+                addSessionToSidebar(data.session_id, data.session_title || 'Saved chat', data.session_url, message);
                 if (data.session_url) {
                     history.replaceState({}, '', data.session_url);
                 }
@@ -280,7 +394,7 @@ async function sendMessage(inputEl) {
     } catch (err) {
         typingDiv.remove();
         setStatusMessage('Something went wrong. Please try again.', true);
-        addMessage('Something went wrong. Please try again.', 'bot error');
+        addMessage('Something went wrong. Please try again.', 'bot error', formatTimeLabel(new Date()));
     }
 }
 

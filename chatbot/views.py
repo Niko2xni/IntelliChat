@@ -112,21 +112,53 @@ def _chat_sessions_for_user(user):
     return ChatSession.objects.filter(user=user).prefetch_related('messages')
 
 
+def _compact_text(value):
+    return re.sub(r'\s+', ' ', value or '').strip()
+
+
 def _serialize_messages(messages):
     return [
         {
             'role': message.role,
             'content': message.content,
+            'created_at': message.created_at.isoformat(),
+            'time_label': message.created_at.strftime('%I:%M %p').lstrip('0'),
         }
         for message in messages
     ]
 
 
 def _session_title_from_message(message):
-    compact = re.sub(r'\s+', ' ', message).strip()
+    compact = _compact_text(message)
     if len(compact) <= 60:
         return compact
     return f"{compact[:57].rstrip()}..."
+
+
+def _chat_session_summaries_for_user(user, sessions=None):
+    if not user.is_authenticated:
+        return []
+
+    session_list = sessions if sessions is not None else _chat_sessions_for_user(user)
+    summaries = []
+
+    for session in session_list:
+        messages = list(session.messages.all())
+        preview_source = messages[-1].content if messages else session.title
+        preview = _compact_text(preview_source)
+        if len(preview) > 80:
+            preview = f"{preview[:77].rstrip()}..."
+
+        summaries.append({
+            'id': session.id,
+            'title': session.title,
+            'preview': preview or 'No messages yet',
+            'updated_iso': session.updated_at.isoformat(),
+            'updated_label': session.updated_at.strftime('%b %d, %I:%M %p').replace(' 0', ' '),
+            'message_count': len(messages),
+        })
+
+    return summaries
 
 
 def _request_identifier(request):
@@ -167,6 +199,7 @@ def _response_cache_key(user_message, history):
 @ensure_csrf_cookie
 def chatbot_home(request, session_id=None):
     chat_sessions = _chat_sessions_for_user(request.user)
+    chat_session_summaries = _chat_session_summaries_for_user(request.user, sessions=chat_sessions)
     current_session = None
     current_messages = []
 
@@ -181,6 +214,7 @@ def chatbot_home(request, session_id=None):
 
     return render(request, 'chatbot/index.html', {
         'chat_sessions': chat_sessions,
+        'chat_session_summaries': chat_session_summaries,
         'current_session': current_session,
         'current_messages': current_messages,
     })
