@@ -8,6 +8,7 @@ urlpatterns = [
     path('signup/', views.signup_view, name='signup'),
     path('logout/', views.logout_view, name='logout'),
     path('profile/', views.profile_view, name='profile'),
+    path('faqs/', views.faqs_view, name='chatbot_faqs'),
     path('request/', views.request_form_view, name='request_form'),
     path('submit-role-request/', views.submit_role_request, name='submit_role_request'),
     path('my-role-request-status/', views.my_role_request_status, name='my_role_request_status'),

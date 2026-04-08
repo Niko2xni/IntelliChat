@@ -1,0 +1,297 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQs | IntelliChat</title>
+
+    <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <style>
+        .faq-page {
+            flex: 1;
+            overflow-y: auto;
+            padding: 28px;
+        }
+
+        .faq-header {
+            margin-bottom: 20px;
+        }
+
+        .faq-header h1 {
+            color: #2f2f2f;
+            font-size: 26px;
+            margin-bottom: 8px;
+        }
+
+        .faq-header p {
+            color: #6f6f6f;
+            font-size: 14px;
+        }
+
+        .faq-filters {
+            align-items: center;
+            background: #fffaf0;
+            border: 1px solid #f2e4c8;
+            border-radius: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 12px;
+        }
+
+        .faq-filters input,
+        .faq-filters select {
+            border: 1px solid #e5e5e5;
+            border-radius: 10px;
+            font-size: 14px;
+            min-width: 180px;
+            padding: 10px 12px;
+        }
+
+        .faq-filters button,
+        .faq-clear-link {
+            background: #f0a500;
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 10px 14px;
+            text-decoration: none;
+        }
+
+        .faq-clear-link {
+            background: #7a7a7a;
+        }
+
+        .faq-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .faq-card {
+            background: #ffffff;
+            border: 1px solid #ececec;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        .faq-card h3 {
+            color: #2f2f2f;
+            font-size: 17px;
+            margin-bottom: 10px;
+        }
+
+        .faq-card p {
+            color: #595959;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+        }
+
+        .faq-meta {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .faq-category,
+        .faq-tag {
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+        }
+
+        .faq-category {
+            background: #fff2d8;
+            color: #b87907;
+        }
+
+        .faq-tag {
+            background: #f4f4f4;
+            color: #666;
+        }
+
+        .faq-empty {
+            background: #fff;
+            border: 1px dashed #e0e0e0;
+            border-radius: 14px;
+            color: #7b7b7b;
+            font-size: 14px;
+            padding: 18px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .faq-page {
+                padding: 16px;
+            }
+
+            .faq-header h1 {
+                font-size: 22px;
+            }
+
+            .faq-filters {
+                gap: 8px;
+            }
+
+            .faq-filters input,
+            .faq-filters select,
+            .faq-filters button,
+            .faq-clear-link {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<header class="header">
+    <div class="header-content">
+        <div class="menu-icon">
+            <i class="fas fa-bars"></i>
+        </div>
+
+        <h1 class="logo">
+            <img src="{% static 'images/logo.png' %}">
+        </h1>
+
+        <div class="header-icons">
+            <div class="notification-wrapper">
+                <button class="header-icon notif-icon notification-btn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" style="display: none;">0</span>
+                </button>
+
+                <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
+                    <div class="notification-header">
+                        <h3>Notifications</h3>
+                        <button id="markAllReadBtn" class="mark-all-read-btn">Mark all as read</button>
+                    </div>
+                    <div class="notification-list"></div>
+                </div>
+            </div>
+
+            <a href="{% url 'profile' %}" class="header-icon profile-icon">
+                {% if user.is_authenticated and user.profile_picture %}
+                <img src="{{ user.profile_picture.url }}" alt="Profile">
+                {% else %}
+                <img src="{% static 'images/profile.png' %}" alt="Profile">
+                {% endif %}
+            </a>
+        </div>
+    </div>
+</header>
+
+<div class="main-container">
+    <aside class="sidebar">
+        <a href="{% url 'chatbot_home' %}" class="sidebar-item">
+            <i class="fas fa-plus"></i>
+            <span>New chat</span>
+        </a>
+
+        <a href="{% url 'chatbot_faqs' %}" class="sidebar-item active">
+            <i class="fas fa-circle-question"></i>
+            <span>FAQs</span>
+        </a>
+
+        <div class="sidebar-section">
+            <div class="sidebar-section-header">
+                <div class="sidebar-section-title">Recent chats</div>
+                {% if user.is_authenticated %}
+                <span class="sidebar-session-count">{{ chat_session_summaries|length }}</span>
+                {% endif %}
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="sidebar-chat-list">
+                {% for session in chat_session_summaries %}
+                <a href="{% url 'chat_session' session.id %}" class="sidebar-chat-link" data-session-id="{{ session.id }}">
+                    <div class="sidebar-chat-main">
+                        <div class="sidebar-chat-title-row">
+                            <span class="sidebar-chat-title">{{ session.title }}</span>
+                            <time class="sidebar-chat-time" datetime="{{ session.updated_iso }}">{{ session.updated_label }}</time>
+                        </div>
+                        <p class="sidebar-chat-preview">{{ session.preview }}</p>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="sidebar-empty">No saved chats yet.</div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="sidebar-empty">Log in to save your chat sessions.</div>
+            {% endif %}
+        </div>
+    </aside>
+
+    <main class="chat-area">
+        <section class="faq-page">
+            <div class="faq-header">
+                <h1>Frequently Asked Questions</h1>
+                <p>These FAQs come directly from the dashboard knowledge base and are available for all students.</p>
+            </div>
+
+            <form method="get" class="faq-filters">
+                <input type="text" name="q" value="{{ query }}" placeholder="Search by keyword, question, or answer">
+
+                <select name="category">
+                    <option value="">All categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}"{% if selected_category == category %} selected{% endif %}>{{ category|title }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit">Apply Filter</button>
+                {% if query or selected_category %}
+                <a href="{% url 'chatbot_faqs' %}" class="faq-clear-link">Clear</a>
+                {% endif %}
+            </form>
+
+            <div class="faq-list">
+                {% for faq in faqs %}
+                <article class="faq-card">
+                    <h3>{{ faq.question }}</h3>
+                    <p>{{ faq.answer }}</p>
+                    <div class="faq-meta">
+                        <span class="faq-category">{{ faq.get_category_display }}</span>
+                        {% for tag in faq.get_tags_list %}
+                        <span class="faq-tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                </article>
+                {% empty %}
+                <div class="faq-empty">
+                    No FAQs found for your filters. Try another keyword or category.
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="{% static 'js/notifications.js' %}"></script>
+<script>
+const menuIcon = document.querySelector('.menu-icon');
+const sidebar = document.querySelector('.sidebar');
+const chatArea = document.querySelector('.chat-area');
+
+if (menuIcon && sidebar && chatArea) {
+    menuIcon.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden');
+        chatArea.classList.toggle('full-width');
+    });
+}
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.db import models
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -16,7 +17,7 @@ from django.views.decorators.http import require_http_methods
 from google import genai
 
 from .models import ChatMessage, ChatSession, Student
-from dashboard.models import Notification, RoleRequest, create_audit_log, create_notification
+from dashboard.models import FAQ, Notification, RoleRequest, create_audit_log, create_notification
 
 SYSTEM_PROMPT = """
 You are the T.I.P. Office of Student Affairs (OSA) Virtual Assistant.
@@ -374,6 +375,42 @@ def profile_view(request):
 def request_form_view(request):
     return render(request, 'chatbot/request_form.html', {
         'chat_sessions': _chat_sessions_for_user(request.user),
+    })
+
+
+def faqs_view(request):
+    chat_sessions = _chat_sessions_for_user(request.user)
+    query = request.GET.get('q', '').strip()
+    category = request.GET.get('category', '').strip()
+
+    faqs = FAQ.objects.filter(is_active=True)
+    if query:
+        faqs = faqs.filter(
+            models.Q(question__icontains=query)
+            | models.Q(answer__icontains=query)
+            | models.Q(tags__icontains=query)
+        )
+    if category:
+        faqs = faqs.filter(category=category)
+
+    faqs = faqs.order_by('-updated_at', '-created_at')
+    categories = (
+        FAQ.objects.filter(is_active=True)
+        .values_list('category', flat=True)
+        .distinct()
+        .order_by('category')
+    )
+
+    return render(request, 'chatbot/faqs.html', {
+        'chat_sessions': chat_sessions,
+        'chat_session_summaries': _chat_session_summaries_for_user(
+            request.user,
+            sessions=chat_sessions,
+        ),
+        'faqs': faqs,
+        'categories': categories,
+        'query': query,
+        'selected_category': category,
     })
 
 
