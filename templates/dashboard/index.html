@@ -37,31 +37,6 @@
             </div>
         </div>
         
-        <div class="metric-card">
-            <div class="metric-header">
-                <h3>Avg Response Time</h3>
-                <span class="metric-icon">⏱️</span>
-            </div>
-            <div class="metric-value">{{ metrics.avg_response_time|floatformat:1 }}s</div>
-            <div class="metric-change {% if metrics.response_time_change <= 0 %}positive{% else %}negative{% endif %}">
-                <span class="arrow">{% if metrics.response_time_change <= 0 %}📈{% else %}📉{% endif %}</span>
-                <span class="percentage">{{ metrics.response_time_change|floatformat:1 }}%</span>
-                <span class="period">from last week</span>
-            </div>
-        </div>
-        
-        <div class="metric-card">
-            <div class="metric-header">
-                <h3>Satisfaction</h3>
-                <span class="metric-icon">📈</span>
-            </div>
-            <div class="metric-value">{{ metrics.satisfaction_rate|floatformat:0 }}%</div>
-            <div class="metric-change {% if metrics.satisfaction_change >= 0 %}positive{% else %}negative{% endif %}">
-                <span class="arrow">{% if metrics.satisfaction_change >= 0 %}📈{% else %}📉{% endif %}</span>
-                <span class="percentage">{{ metrics.satisfaction_change|floatformat:1 }}%</span>
-                <span class="period">from last week</span>
-            </div>
-        </div>
     </div>
     
 <div class="charts-grid">
@@ -71,7 +46,7 @@
     </div>
     
     <div class="chart-container">
-        <h3>Usage vs. Satisfaction</h3>
+        <h3>Usage Over Time</h3>
         <canvas id="combinedChart"></canvas>
     </div>
 </div>
@@ -130,30 +105,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
 const combinedCtx = document.getElementById('combinedChart').getContext('2d');
 new Chart(combinedCtx, {
+    type: 'bar',
     data: {
         labels: ['6am', '9am', '12pm', '3pm', '6pm', '9pm', '12am', '3am'],
-        datasets: [
-            {
-                type: 'bar', // Volume as Bars
-                label: 'Student Queries',
-                data: [15, 45, 80, 65, 50, 110, 130, 40],
-                backgroundColor: 'rgba(255, 165, 0, 0.4)',
-                borderColor: '#FFA500',
-                borderWidth: 1,
-                yAxisID: 'y', // Left Axis
-            },
-            {
-                type: 'line', // Satisfaction as a Line
-                label: 'Satisfaction Rate (%)',
-                data: [90, 85, 88, 82, 85, 95, 92, 88],
-                borderColor: '#FF4136', // Professional Red
-                backgroundColor: 'transparent',
-                borderWidth: 3,
-                tension: 0.4,
-                pointRadius: 5,
-                yAxisID: 'y1', // Right Axis
-            }
-        ]
+        datasets: [{
+            label: 'Student Queries',
+            data: [15, 45, 80, 65, 50, 110, 130, 40],
+            backgroundColor: 'rgba(255, 165, 0, 0.4)',
+            borderColor: '#FFA500',
+            borderWidth: 1,
+        }]
     },
     options: {
         responsive: true,
@@ -165,21 +126,12 @@ new Chart(combinedCtx, {
             legend: { position: 'top' }
         },
         scales: {
-            y: { // Left Axis: Number of Queries
+            y: {
                 type: 'linear',
                 display: true,
                 position: 'left',
                 beginAtZero: true,
                 title: { display: true, text: 'Total Queries' }
-            },
-            y1: { // Right Axis: Satisfaction %
-                type: 'linear',
-                display: true,
-                position: 'right',
-                min: 0,
-                max: 100,
-                grid: { drawOnChartArea: false }, // Only show grid lines for left axis
-                title: { display: true, text: 'Satisfaction %' }
             }
         }
     }
