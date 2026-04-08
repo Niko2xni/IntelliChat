@@ -112,6 +112,15 @@ Math Enhancement Program (MEP): A free summer tutorial for incoming freshmen to 
 
 MAX_CHAT_MESSAGE_LENGTH = getattr(settings, 'CHAT_MESSAGE_MAX_LENGTH', 500)
 CHAT_DOCUMENT_RESULT_LIMIT = getattr(settings, 'CHAT_DOCUMENT_RESULT_LIMIT', 3)
+DOCUMENT_INTENT_PATTERN = re.compile(
+    r"\b(document|documents|form|forms|template|templates|guideline|guidelines|manual|handbook|file|files|pdf|docx|jpg|jpeg|png|download|copy|copies|softcopy|attachment|attachments)\b",
+    re.IGNORECASE,
+)
+DOCUMENT_KEYWORD_STOPWORDS = {
+    'the', 'and', 'for', 'with', 'from', 'that', 'this', 'need', 'send', 'show', 'give',
+    'copy', 'copies', 'please', 'share', 'provide', 'download', 'file', 'files', 'document',
+    'documents', 'attachment', 'attachments',
+}
 
 
 def _chat_sessions_for_user(user):
@@ -337,20 +346,19 @@ def _format_file_size(bytes_size):
 
 
 def _find_related_documents(user_message, limit=CHAT_DOCUMENT_RESULT_LIMIT):
-    document_intent_pattern = re.compile(
-        r'\b(document|documents|form|forms|template|templates|guideline|guidelines|file|files|pdf|docx|jpg|jpeg|png|download)\b',
-        re.IGNORECASE,
-    )
-    if not document_intent_pattern.search(user_message):
+    if not DOCUMENT_INTENT_PATTERN.search(user_message):
         return []
 
     keywords = [
         word for word in re.findall(r'[a-zA-Z0-9]{3,}', user_message.lower())
-        if word not in {'the', 'and', 'for', 'with', 'from', 'that', 'this', 'need', 'send', 'show', 'give'}
+        if word not in DOCUMENT_KEYWORD_STOPWORDS
     ]
 
     queryset = Document.objects.filter(status='active')
     search_terms = keywords[:6]
+
+    if not search_terms:
+        return []
 
     if search_terms:
         query = models.Q()
@@ -360,10 +368,44 @@ def _find_related_documents(user_message, limit=CHAT_DOCUMENT_RESULT_LIMIT):
                 | models.Q(description__icontains=term)
                 | models.Q(category__icontains=term)
                 | models.Q(file_type__icontains=term)
+                | models.Q(file__icontains=term)
             )
         queryset = queryset.filter(query)
 
     return list(queryset.order_by('-download_count', '-updated_at')[:limit])
+
+
+def _documents_from_recent_attachments(chat_session, limit=CHAT_DOCUMENT_RESULT_LIMIT):
+    if chat_session is None:
+        return []
+
+    recent_assistant_messages = list(
+        chat_session.messages.filter(role=ChatMessage.ASSISTANT).order_by('-created_at')[:8]
+    )
+
+    ordered_document_ids = []
+    seen_ids = set()
+
+    for message in recent_assistant_messages:
+        for attachment in (message.attachments or []):
+            doc_id = attachment.get('id')
+            if not doc_id or doc_id in seen_ids:
+                continue
+            seen_ids.add(doc_id)
+            ordered_document_ids.append(doc_id)
+            if len(ordered_document_ids) >= limit:
+                break
+        if len(ordered_document_ids) >= limit:
+            break
+
+    if not ordered_document_ids:
+        return []
+
+    document_map = {
+        document.id: document
+        for document in Document.objects.filter(id__in=ordered_document_ids, status='active')
+    }
+    return [document_map[doc_id] for doc_id in ordered_document_ids if doc_id in document_map]
 
 
 def _document_context_for_prompt(documents):
@@ -772,6 +814,9 @@ def ask_gemini(request):
                 return JsonResponse({'error': 'Chat session not found.'}, status=404)
 
             history_prompt = _build_history_prompt(chat_session.messages.all())
+
+            if not related_documents and DOCUMENT_INTENT_PATTERN.search(user_message):
+                related_documents = _documents_from_recent_attachments(chat_session)
 
         prompt = user_message
         if history_prompt:
