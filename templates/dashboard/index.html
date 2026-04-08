@@ -46,7 +46,7 @@
     </div>
     
     <div class="chart-container">
-        <h3>Usage Over Time</h3>
+        <h3>Average Response Time Over Time</h3>
         <canvas id="combinedChart"></canvas>
     </div>
 </div>
@@ -76,68 +76,81 @@
     {{ inquiry_labels|json_script:"inquiryLabels" }}
     {{ inquiry_counts|json_script:"inquiryCounts" }}
     {{ inquiry_colors|json_script:"inquiryColors" }}
+    {{ response_time_labels|json_script:"responseTimeLabels" }}
+    {{ response_time_values|json_script:"responseTimeValues" }}
 
 <script>
 console.log('dashboard inline script executing');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOMContentLoaded handler started');
     
-    // 1. Bar Chart: Common Inquiries
-    const inquiriesCtx = document.getElementById('inquiriesChart').getContext('2d');
-    new Chart(inquiriesCtx, {
-        type: 'bar',
-        data: {
-            labels: ['Account Help', 'Technical Support', 'General Info', 'Billing', 'Other'],
-            datasets: [{
-                label: 'Inquiries',
-                data: [45, 38, 30, 25, 20],
-                backgroundColor: '#FFA500',
-                borderRadius: 5
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false }
-            }
-        }
-    });
-    
-const combinedCtx = document.getElementById('combinedChart').getContext('2d');
-new Chart(combinedCtx, {
-    type: 'bar',
-    data: {
-        labels: ['6am', '9am', '12pm', '3pm', '6pm', '9pm', '12am', '3am'],
-        datasets: [{
-            label: 'Student Queries',
-            data: [15, 45, 80, 65, 50, 110, 130, 40],
-            backgroundColor: 'rgba(255, 165, 0, 0.4)',
-            borderColor: '#FFA500',
-            borderWidth: 1,
-        }]
-    },
-    options: {
-        responsive: true,
-        interaction: {
-            mode: 'index',
-            intersect: false,
-        },
-        plugins: {
-            legend: { position: 'top' }
-        },
-        scales: {
-            y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                beginAtZero: true,
-                title: { display: true, text: 'Total Queries' }
-            }
-        }
-    }
-});
+    const inquiryLabels = JSON.parse(document.getElementById('inquiryLabels').textContent);
+    const inquiryCounts = JSON.parse(document.getElementById('inquiryCounts').textContent);
+    const inquiryColors = JSON.parse(document.getElementById('inquiryColors').textContent);
 
-    // 3. Pie Chart: Dynamic Top Inquiries
+    // 1. Bar Chart: Common Inquiries
+    const inquiriesCanvas = document.getElementById('inquiriesChart');
+    if (inquiriesCanvas) {
+        const inquiriesCtx = inquiriesCanvas.getContext('2d');
+        new Chart(inquiriesCtx, {
+            type: 'bar',
+            data: {
+                labels: inquiryLabels,
+                datasets: [{
+                    label: 'Inquiries',
+                    data: inquiryCounts,
+                    backgroundColor: inquiryColors,
+                    borderColor: inquiryColors,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+    
+    const responseTimeLabels = JSON.parse(document.getElementById('responseTimeLabels').textContent);
+    const responseTimeValues = JSON.parse(document.getElementById('responseTimeValues').textContent);
+
+    const combinedCanvas = document.getElementById('combinedChart');
+    if (combinedCanvas) {
+        const combinedCtx = combinedCanvas.getContext('2d');
+        new Chart(combinedCtx, {
+            type: 'bar',
+            data: {
+                labels: responseTimeLabels,
+                datasets: [{
+                    label: 'Average Response Time (s)',
+                    data: responseTimeValues,
+                    backgroundColor: 'rgba(255, 165, 0, 0.4)',
+                    borderColor: '#FFA500',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Average Response Time (s)' }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Pie Chart: Dynamic Top Inquiries
     const pieCanvas = document.getElementById('inquiriesPieChart');
     if (pieCanvas) {
         const pieCtx = pieCanvas.getContext('2d');

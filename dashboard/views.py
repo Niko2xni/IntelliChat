@@ -1,3 +1,6 @@
+from collections import defaultdict
+from datetime import timedelta
+
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, FileResponse, Http404
@@ -5,14 +8,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
 from django.utils import timezone
+from chatbot.models import ChatMessage, ChatSession
 from .models import (
     AuditLog,
-    CommonInquiry,
     DashboardMetrics,
     Document,
     FAQ,
     Notification,
-    ResponseTimeData,
     RoleRequest,
     create_audit_log,
     create_notification,
@@ -43,47 +45,169 @@ def _validate_document_upload(file):
     return None
 
 
-@user_passes_test(is_admin, login_url='login')
-def dashboard(request):
-    """Main admin dashboard view."""
-    try:
-        metrics = DashboardMetrics.objects.latest('last_updated')
-    except DashboardMetrics.DoesNotExist:
-        metrics = DashboardMetrics.objects.create(
-            total_chats=1247,
-            active_users=342,
-            avg_response_time=2.1,
-            satisfaction_rate=94.0,
-            chats_change=12.5,
-            users_change=8.2,
-            response_time_change=-5.3,
-            satisfaction_change=3.1
+def _safe_mean(values):
+    return sum(values) / len(values) if values else 0.0
+
+
+def _safe_percent_change(current, previous):
+    if previous == 0:
+        return 0.0 if current == 0 else 100.0
+
+    return ((current - previous) / previous) * 100.0
+
+
+def _clean_text(value, fallback='Untitled chat'):
+    compact = ' '.join((value or '').split()).strip()
+    return compact or fallback
+
+
+def _truncate_text(value, max_length=45):
+    compact = _clean_text(value)
+    if len(compact) <= max_length:
+        return compact
+    return f"{compact[:max_length - 3].rstrip()}..."
+
+
+def _collect_response_time_points(sessions):
+    response_points = []
+
+    for session in sessions:
+        user_message_timestamp = None
+
+        for message in session.messages.all():
+            if message.role == ChatMessage.USER:
+                user_message_timestamp = message.created_at
+            elif message.role == ChatMessage.ASSISTANT and user_message_timestamp is not None:
+                response_seconds = max((message.created_at - user_message_timestamp).total_seconds(), 0.0)
+                response_points.append((message.created_at.date(), response_seconds))
+                user_message_timestamp = None
+
+    return response_points
+
+
+def _build_response_time_chart_data(response_points):
+    cutoff_date = (timezone.now() - timedelta(days=13)).date()
+    buckets = defaultdict(list)
+
+    for response_date, response_seconds in response_points:
+        if response_date >= cutoff_date:
+            buckets[response_date].append(response_seconds)
+
+    ordered_dates = sorted(buckets)
+    labels = [response_date.strftime('%b %d') for response_date in ordered_dates]
+    values = [round(_safe_mean(buckets[response_date]), 2) for response_date in ordered_dates]
+
+    return ordered_dates, labels, values
+
+
+def _build_inquiry_chart_data(sessions):
+    cutoff = timezone.now() - timedelta(days=30)
+    buckets = {}
+
+    for session in sessions:
+        if session.created_at < cutoff:
+            continue
+
+        title = _clean_text(session.title)
+        key = title.casefold()
+        bucket = buckets.setdefault(
+            key,
+            {
+                'title': title,
+                'label': _truncate_text(title),
+                'count': 0,
+                'first_seen': session.created_at,
+            },
         )
-    
-    inquiries = list(CommonInquiry.objects.all()[:5])
+        bucket['count'] += 1
+        if session.created_at > bucket['first_seen']:
+            bucket['first_seen'] = session.created_at
 
-    # build simple arrays for javascript so we don't have to use template loops inside script tags
-    # this avoids editor/linters showing red squiggles and also makes the data easier to consume.
-    # no json.dumps here; json_script will handle serialization
-    inquiry_labels = [inq.title for inq in inquiries]
-    inquiry_counts = [inq.count for inq in inquiries]
-    # fixed palette used both for chart and legend
+    ordered_entries = sorted(
+        buckets.values(),
+        key=lambda entry: (-entry['count'], -entry['first_seen'].timestamp(), entry['title'].casefold()),
+    )[:5]
+
+    inquiry_items = [
+        {
+            'title': entry['title'],
+            'description': 'Derived from live chat sessions',
+            'count': entry['count'],
+        }
+        for entry in ordered_entries
+    ]
+    inquiry_labels = [entry['label'] for entry in ordered_entries]
+    inquiry_counts = [entry['count'] for entry in ordered_entries]
     palette = ['#FFA500', '#FF7F50', '#FFD700', '#FF8C00', '#E69500']
-    # pair each inquiry with a color for easier templating
-    inquiry_items = [(inq, palette[idx % len(palette)]) for idx, inq in enumerate(inquiries)]
+    inquiry_colors = [palette[index % len(palette)] for index in range(len(ordered_entries))]
 
-    inquiry_colors = palette
+    return inquiry_items, inquiry_labels, inquiry_counts, inquiry_colors
 
-    context = {
+
+def _build_dashboard_metrics(sessions, response_points):
+    now = timezone.now()
+    current_window_start = now - timedelta(days=7)
+    previous_window_start = now - timedelta(days=14)
+
+    current_sessions = [session for session in sessions if session.updated_at >= current_window_start]
+    previous_sessions = [session for session in sessions if previous_window_start <= session.updated_at < current_window_start]
+
+    current_users = {session.user_id for session in current_sessions}
+    previous_users = {session.user_id for session in previous_sessions}
+
+    current_response_values = [
+        response_seconds
+        for response_date, response_seconds in response_points
+        if response_date >= current_window_start.date()
+    ]
+    previous_response_values = [
+        response_seconds
+        for response_date, response_seconds in response_points
+        if previous_window_start.date() <= response_date < current_window_start.date()
+    ]
+
+    metrics = DashboardMetrics()
+    metrics.total_chats = len(sessions)
+    metrics.active_users = len(current_users)
+    metrics.avg_response_time = round(_safe_mean([response_seconds for _, response_seconds in response_points]), 2)
+    metrics.chats_change = _safe_percent_change(len(current_sessions), len(previous_sessions))
+    metrics.users_change = _safe_percent_change(len(current_users), len(previous_users))
+    metrics.response_time_change = _safe_percent_change(
+        _safe_mean(current_response_values),
+        _safe_mean(previous_response_values),
+    )
+    metrics.satisfaction_rate = 0.0
+    metrics.satisfaction_change = 0.0
+    metrics.last_updated = now
+
+    return metrics
+
+
+def _load_live_dashboard_data():
+    sessions = list(ChatSession.objects.select_related('user').prefetch_related('messages'))
+    response_points = _collect_response_time_points(sessions)
+    response_time_dates, response_time_labels, response_time_values = _build_response_time_chart_data(response_points)
+    inquiry_items, inquiry_labels, inquiry_counts, inquiry_colors = _build_inquiry_chart_data(sessions)
+
+    metrics = _build_dashboard_metrics(sessions, response_points)
+
+    return {
         'metrics': metrics,
-        'inquiries': inquiries,
-        'inquiry_items': inquiry_items,
+        'inquiries': inquiry_items,
+        'inquiry_items': [(item, color) for item, color in zip(inquiry_items, inquiry_colors)],
         'inquiry_labels': inquiry_labels,
         'inquiry_counts': inquiry_counts,
         'inquiry_colors': inquiry_colors,
+        'response_time_dates': response_time_dates,
+        'response_time_labels': response_time_labels,
+        'response_time_values': response_time_values,
     }
-    
-    return render(request, 'dashboard/index.html', context)
+
+
+@user_passes_test(is_admin, login_url='login')
+def dashboard(request):
+    """Main admin dashboard view."""
+    return render(request, 'dashboard/index.html', _load_live_dashboard_data())
 
 @user_passes_test(is_admin, login_url='login')
 def admin_profile(request):
@@ -95,11 +219,11 @@ def admin_profile(request):
 @require_http_methods(["GET"])
 def get_chart_data(request):
     """API endpoint to get chart data."""
-    response_times = ResponseTimeData.objects.all().order_by('date')
-    
+    live_data = _load_live_dashboard_data()
+
     data = {
-        'dates': [str(rt.date) for rt in response_times],
-        'times': [rt.average_response_time for rt in response_times],
+        'dates': [response_date.isoformat() for response_date in live_data['response_time_dates']],
+        'times': live_data['response_time_values'],
     }
     
     return JsonResponse(data)
@@ -109,11 +233,11 @@ def get_chart_data(request):
 @require_http_methods(["GET"])
 def get_inquiries_data(request):
     """API endpoint to get common inquiries data."""
-    inquiries = CommonInquiry.objects.all()
-    
+    live_data = _load_live_dashboard_data()
+
     data = {
-        'labels': [inq.title for inq in inquiries],
-        'data': [inq.count for inq in inquiries],
+        'labels': live_data['inquiry_labels'],
+        'data': live_data['inquiry_counts'],
     }
     
     return JsonResponse(data)
