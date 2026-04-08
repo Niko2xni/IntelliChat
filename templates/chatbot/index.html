@@ -72,19 +72,31 @@
             {% if user.is_authenticated %}
                 <div class="sidebar-chat-list">
                 {% for session in chat_session_summaries %}
-                <a
-                    href="{% url 'chat_session' session.id %}"
+                <div
                     class="sidebar-chat-link{% if current_session and current_session.id == session.id %} current{% endif %}"
                     data-session-id="{{ session.id }}"
                 >
-                    <div class="sidebar-chat-main">
+                    <a
+                        href="{% url 'chat_session' session.id %}"
+                        class="sidebar-chat-main"
+                    >
                         <div class="sidebar-chat-title-row">
                             <span class="sidebar-chat-title">{{ session.title }}</span>
                             <time class="sidebar-chat-time" datetime="{{ session.updated_iso }}">{{ session.updated_label }}</time>
                         </div>
                         <p class="sidebar-chat-preview">{{ session.preview }}</p>
-                    </div>
-                </a>
+                    </a>
+                    <button
+                        type="button"
+                        class="sidebar-chat-delete"
+                        data-session-id="{{ session.id }}"
+                        data-session-title="{{ session.title|escape }}"
+                        aria-label="Delete {{ session.title }}"
+                        title="Delete chat"
+                    >
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
                 {% empty %}
                 <div class="sidebar-empty">No saved chats yet.</div>
                 {% endfor %}
@@ -107,12 +119,7 @@
             </div>
 
             <div class="chat-input-container">
-                <label for="file-upload" class="paperclip-icon-label">
-                    <i class="fas fa-paperclip"></i>
-                </label>
-                <input type="file" id="file-upload" class="file-upload" multiple>
-                <div class="uploaded-files-container" id="uploadedFilesContainer"></div>
-                <input type="text" class="chat-input" id="welcomeInput" placeholder="Ask anything">
+                <input type="text" class="chat-input" id="welcomeInput" placeholder="Ask anything" maxlength="500">
                 <div class="send-button" id="welcomeSendBtn">
                     <i class="fas fa-paper-plane"></i>
                 </div>
@@ -141,12 +148,7 @@
 
             <div class="chat-input-wrapper">
                 <div class="chat-input-container">
-                    <label for="file-upload-active" class="paperclip-icon-label">
-                        <i class="fas fa-paperclip"></i>
-                    </label>
-                    <input type="file" id="file-upload-active" class="file-upload" multiple>
-                    <div class="uploaded-files-container" id="uploadedFilesContainerActive"></div>
-                    <input type="text" class="chat-input" id="chatInputActive" placeholder="Ask anything">
+                    <input type="text" class="chat-input" id="chatInputActive" placeholder="Ask anything" maxlength="500">
                     <div class="send-button" id="activeSendBtn">
                         <i class="fas fa-paper-plane"></i>
                     </div>
@@ -156,6 +158,17 @@
         </div>
     </main>
 </div>
+
+<dialog class="chat-delete-dialog" id="chatDeleteDialog">
+    <form method="dialog" class="chat-delete-dialog-form">
+        <h3>Delete Chat</h3>
+        <p id="chatDeleteMessage">Are you sure you want to delete this chat?</p>
+        <div class="chat-delete-actions">
+            <button type="button" class="chat-delete-cancel" id="chatDeleteCancel">Cancel</button>
+            <button type="submit" class="chat-delete-confirm" id="chatDeleteConfirm" value="confirm">Delete</button>
+        </div>
+    </form>
+</dialog>
 
 {{ current_messages|json_script:"initial-chat-messages" }}
 <script>
@@ -175,11 +188,15 @@ const chatSessionMeta = document.getElementById('chatSessionMeta');
 const chatStatusMessage = document.getElementById('chatStatusMessage');
 const chatListContainer = document.querySelector('.sidebar-chat-list');
 const sessionCountBadge = document.querySelector('.sidebar-session-count');
+const chatDeleteDialog = document.getElementById('chatDeleteDialog');
+const chatDeleteMessage = document.getElementById('chatDeleteMessage');
+const chatDeleteCancel = document.getElementById('chatDeleteCancel');
+const MAX_PROMPT_LENGTH = 500;
 
 let chatStarted = {% if current_session %}true{% else %}false{% endif %};
 let currentSessionId = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
-let uploadedFiles = [];
 let messageCount = 0;
+let pendingDeleteSession = null;
 
 function switchToActiveChat() {
     if (!chatStarted) {
@@ -224,7 +241,7 @@ function updateSessionMeta() {
     chatSessionMeta.textContent = `${messageCount} ${noun} in this chat`;
 }
 
-function addMessage(text, sender, timeLabel = null) {
+function addMessage(text, sender, timeLabel = null, documents = []) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `chat-bubble ${sender}`;
 
@@ -232,6 +249,23 @@ function addMessage(text, sender, timeLabel = null) {
     contentDiv.className = 'chat-bubble-content';
     contentDiv.textContent = text;
     msgDiv.appendChild(contentDiv);
+
+    if (documents.length) {
+        const docsDiv = document.createElement('div');
+        docsDiv.className = 'chat-bubble-documents';
+
+        documents.forEach((doc) => {
+            const link = document.createElement('a');
+            link.className = 'chat-document-link';
+            link.href = doc.url;
+            link.textContent = `${doc.title} (${doc.file_type}, ${doc.file_size_display})`;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            docsDiv.appendChild(link);
+        });
+
+        msgDiv.appendChild(docsDiv);
+    }
 
     if (timeLabel) {
         const timeDiv = document.createElement('div');
@@ -259,6 +293,7 @@ function renderSavedMessages() {
             message.content,
             message.role === 'user' ? 'user' : 'bot',
             message.time_label || null,
+            message.attachments || [],
         );
     });
     updateSessionMeta();
@@ -269,9 +304,69 @@ function setStatusMessage(message, isError = false) {
     chatStatusMessage.classList.toggle('error', isError);
 }
 
+function validatePrompt(message) {
+    if (!message) {
+        return 'Message cannot be empty.';
+    }
+
+    if (message.length > MAX_PROMPT_LENGTH) {
+        return `Message must be ${MAX_PROMPT_LENGTH} characters or less.`;
+    }
+
+    return '';
+}
+
 function clearActiveSidebarState() {
     document.querySelectorAll('.sidebar-chat-link').forEach((link) => {
         link.classList.remove('current');
+    });
+}
+
+function updateSessionCount(delta) {
+    if (!sessionCountBadge) {
+        return;
+    }
+
+    const currentCount = Number.parseInt(sessionCountBadge.textContent || '0', 10);
+    const nextCount = Math.max((Number.isNaN(currentCount) ? 0 : currentCount) + delta, 0);
+    sessionCountBadge.textContent = String(nextCount);
+}
+
+function ensureSidebarEmptyState() {
+    const list = chatListContainer || document.querySelector('.sidebar-chat-list');
+    if (!list || list.querySelector('.sidebar-chat-link')) {
+        return;
+    }
+
+    if (!document.querySelector('.sidebar-empty')) {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'sidebar-empty';
+        emptyState.textContent = 'No saved chats yet.';
+        list.parentElement.appendChild(emptyState);
+    }
+}
+
+function openDeleteDialog(sessionId, sessionTitle, button) {
+    pendingDeleteSession = { sessionId, sessionTitle, button };
+    chatDeleteMessage.textContent = `Delete "${sessionTitle}"?`;
+    chatDeleteDialog.showModal();
+}
+
+function attachDeleteHandlers(scope = document) {
+    scope.querySelectorAll('.sidebar-chat-delete').forEach((button) => {
+        if (button.dataset.deleteBound === 'true') {
+            return;
+        }
+
+        button.dataset.deleteBound = 'true';
+        button.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const sessionId = button.dataset.sessionId;
+            const sessionTitle = button.dataset.sessionTitle || 'this chat';
+            openDeleteDialog(sessionId, sessionTitle, button);
+        });
     });
 }
 
@@ -294,6 +389,11 @@ function addSessionToSidebar(sessionId, title, url, latestPreview = '') {
             existingTime.textContent = nowLabel;
             existingTime.dateTime = new Date().toISOString();
         }
+        const existingDeleteButton = existing.querySelector('.sidebar-chat-delete');
+        if (existingDeleteButton) {
+            existingDeleteButton.dataset.sessionTitle = title || 'Saved chat';
+            existingDeleteButton.setAttribute('aria-label', `Delete ${title || 'Saved chat'}`);
+        }
 
         clearActiveSidebarState();
         existing.classList.add('current');
@@ -306,18 +406,27 @@ function addSessionToSidebar(sessionId, title, url, latestPreview = '') {
         emptyState.remove();
     }
 
-    const link = document.createElement('a');
-    link.href = url;
+    const link = document.createElement('div');
     link.className = 'sidebar-chat-link current';
     link.dataset.sessionId = sessionId;
     link.innerHTML = `
-        <div class="sidebar-chat-main">
+        <a href="${url}" class="sidebar-chat-main">
             <div class="sidebar-chat-title-row">
                 <span class="sidebar-chat-title">${safeTitle}</span>
                 <time class="sidebar-chat-time" datetime="${new Date().toISOString()}">${nowLabel}</time>
             </div>
             <p class="sidebar-chat-preview">${safePreview}</p>
-        </div>
+        </a>
+        <button
+            type="button"
+            class="sidebar-chat-delete"
+            data-session-id="${sessionId}"
+            data-session-title="${safeTitle}"
+            aria-label="Delete ${safeTitle}"
+            title="Delete chat"
+        >
+            <span aria-hidden="true">&times;</span>
+        </button>
     `;
 
     const list = chatListContainer || document.querySelector('.sidebar-chat-list') || document.querySelector('.sidebar-section');
@@ -329,10 +438,8 @@ function addSessionToSidebar(sessionId, title, url, latestPreview = '') {
         list.appendChild(link);
     }
 
-    if (sessionCountBadge) {
-        const currentCount = Number.parseInt(sessionCountBadge.textContent || '0', 10);
-        sessionCountBadge.textContent = Number.isNaN(currentCount) ? '1' : String(currentCount + 1);
-    }
+    updateSessionCount(1);
+    attachDeleteHandlers(link);
 }
 
 function resetToNewChat() {
@@ -351,7 +458,12 @@ function resetToNewChat() {
 
 async function sendMessage(inputEl) {
     const message = inputEl.value.trim();
-    if (!message) return;
+    const validationError = validatePrompt(message);
+
+    if (validationError) {
+        setStatusMessage(validationError, true);
+        return;
+    }
 
     switchToActiveChat();
     setStatusMessage('');
@@ -385,7 +497,7 @@ async function sendMessage(inputEl) {
         }
 
         if (data.response) {
-            addMessage(data.response, 'bot', formatTimeLabel(new Date()));
+            addMessage(data.response, 'bot', formatTimeLabel(new Date()), data.documents || []);
 
             if (data.session_id) {
                 currentSessionId = data.session_id;
@@ -424,53 +536,70 @@ chatInputActive.addEventListener('keydown', (e) => {
 
 newChatButton.addEventListener('click', resetToNewChat);
 
-function setupFileUpload(fileInputId, containerId) {
-    document.getElementById(fileInputId).addEventListener('change', function(e) {
-        const files = e.target.files;
-        const container = document.getElementById(containerId);
-
-        for (let file of files) {
-            if (file.type.startsWith('image/')) {
-                const id = Date.now() + Math.random();
-                const url = URL.createObjectURL(file);
-                uploadedFiles.push({id, file, url});
-
-                const div = document.createElement('div');
-                div.className = "uploaded-file";
-                div.id = id;
-                div.innerHTML = `
-                    <img src="${url}">
-                    <div class="delete-icon" onclick="removeFile('${id}')">
-                        <i class="fas fa-times"></i>
-                    </div>
-                `;
-                container.appendChild(div);
-            }
-        }
-        e.target.value = "";
-    });
-}
-
-setupFileUpload('file-upload', 'uploadedFilesContainer');
-setupFileUpload('file-upload-active', 'uploadedFilesContainerActive');
-
-function removeFile(id) {
-    const fileElement = document.getElementById(id);
-    if (fileElement) {
-        const index = uploadedFiles.findIndex(f => f.id == id);
-        if (index > -1) {
-            URL.revokeObjectURL(uploadedFiles[index].url);
-            uploadedFiles.splice(index, 1);
-        }
-        fileElement.remove();
-    }
-}
-
 menuIcon.addEventListener('click', () => {
     sidebar.classList.toggle('hidden');
     chatArea.classList.toggle('full-width');
 });
 
+[welcomeInput, chatInputActive].forEach((input) => {
+    input.addEventListener('input', () => {
+        const message = input.value.trim();
+        const validationError = validatePrompt(message);
+
+        if (!message) {
+            setStatusMessage('');
+            return;
+        }
+
+        setStatusMessage(validationError, Boolean(validationError));
+    });
+});
+
+chatDeleteCancel.addEventListener('click', () => {
+    pendingDeleteSession = null;
+    chatDeleteDialog.close();
+});
+
+chatDeleteDialog.addEventListener('close', async () => {
+    if (chatDeleteDialog.returnValue !== 'confirm' || !pendingDeleteSession) {
+        pendingDeleteSession = null;
+        return;
+    }
+
+    const { sessionId, button } = pendingDeleteSession;
+    pendingDeleteSession = null;
+
+    try {
+        const response = await fetch(`/chatbot/sessions/${sessionId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+            },
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            setStatusMessage(data.error || 'Failed to delete chat session.', true);
+            return;
+        }
+
+        const sessionItem = button.closest('.sidebar-chat-link');
+        if (sessionItem) {
+            sessionItem.remove();
+        }
+        updateSessionCount(-1);
+        ensureSidebarEmptyState();
+        setStatusMessage(data.message || 'Chat session deleted successfully.');
+
+        if (String(currentSessionId) === String(sessionId)) {
+            resetToNewChat();
+        }
+    } catch (error) {
+        setStatusMessage('Failed to delete chat session.', true);
+    }
+});
+
+attachDeleteHandlers();
 renderSavedMessages();
 </script>
 

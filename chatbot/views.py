@@ -9,15 +9,16 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import models
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from google import genai
 
 from .models import ChatMessage, ChatSession, Student
-from dashboard.models import FAQ, Notification, RoleRequest, create_audit_log, create_notification
+from dashboard.models import Document, FAQ, Notification, RoleRequest, create_audit_log, create_notification
 
 SYSTEM_PROMPT = """
 You are the T.I.P. Office of Student Affairs (OSA) Virtual Assistant.
@@ -26,6 +27,7 @@ of the Technological Institute of the Philippines.
 
 CONTEXT & RULES:
 - Use the provided T.I.P. Information to answer queries about history, policies, and locations.
+- Use any provided admin-uploaded document list or document context as an approved knowledge source.
 - If a student asks about a location, specify if it's in T.I.P. Manila (Casal or Arlegui) or Quezon City.
 - For academic rules (absences, refunds, grades), be precise. (e.g., 20% absence rule, 90% refund in 1st week).
 - If a question is NOT covered by the provided data, politely advise the student to visit the
@@ -35,13 +37,14 @@ CONTEXT & RULES:
 
 SCOPE OF KNOWLEDGE:
 - You ONLY answer questions related to the Technological Institute of the Philippines (T.I.P.), its policies, history, locations, and student services.
-- Your knowledge base is strictly limited to the information provided below.
+- Your knowledge base includes the information provided below and any active admin-uploaded documents explicitly provided in the current prompt.
 
 STRICT OUT-OF-SCOPE RULES:
 1. If a user asks a question that is NOT related to T.I.P. (e.g., general world news, sports, math problems unrelated to T.I.P. tutorials, or creative writing), you must politely decline.
 2. Respond with: "I'm sorry, I am only programmed to assist with T.I.P. Office of Student Affairs related inquiries. Please visit the OSA office for other concerns."
 3. Do not engage in casual conversation or "roleplay" outside of your professional persona.
 4. Only write in Paragraphs.
+5. Questions asking whether a T.I.P. document, form, guideline, or manual is available are in-scope. If matching admin documents are provided, say they are available and mention the attached document names naturally in your answer.
 
 T.I.P. KNOWLEDGE BASE:
 I. About the Technological Institute of the Philippines (T.I.P.)
@@ -107,6 +110,9 @@ Medical/Dental: Clinic provides basic first aid, consultations, and Annual Oral 
 Math Enhancement Program (MEP): A free summer tutorial for incoming freshmen to prepare for college-level math.
 """
 
+MAX_CHAT_MESSAGE_LENGTH = getattr(settings, 'CHAT_MESSAGE_MAX_LENGTH', 500)
+CHAT_DOCUMENT_RESULT_LIMIT = getattr(settings, 'CHAT_DOCUMENT_RESULT_LIMIT', 3)
+
 
 def _chat_sessions_for_user(user):
     if not user.is_authenticated:
@@ -118,11 +124,19 @@ def _compact_text(value):
     return re.sub(r'\s+', ' ', value or '').strip()
 
 
+def _truncate_for_history(value, max_length):
+    compact = _compact_text(value)
+    if len(compact) <= max_length:
+        return compact
+    return f"{compact[:max_length - 3].rstrip()}..."
+
+
 def _serialize_messages(messages):
     return [
         {
             'role': message.role,
             'content': message.content,
+            'attachments': message.attachments or [],
             'created_at': message.created_at.isoformat(),
             'time_label': message.created_at.strftime('%I:%M %p').lstrip('0'),
         }
@@ -163,6 +177,11 @@ def _chat_session_summaries_for_user(user, sessions=None):
     return summaries
 
 
+def _touch_chat_session(chat_session):
+    chat_session.updated_at = timezone.now()
+    chat_session.save(update_fields=['updated_at'])
+
+
 def _request_identifier(request):
     if request.user.is_authenticated:
         return f"user:{request.user.pk}"
@@ -187,15 +206,183 @@ def _is_rate_limited(request):
     return current_count > limit
 
 
-def _response_cache_key(user_message, history):
+def _response_cache_key(user_message, history, document_ids=None):
     payload = json.dumps(
         {
             'message': user_message,
             'history': history,
+            'documents': document_ids or [],
         },
         sort_keys=True,
     )
     return f"chat-response:{sha256(payload.encode('utf-8')).hexdigest()}"
+
+
+def _serialize_chat_document(document):
+    return {
+        'id': document.id,
+        'title': document.title,
+        'file_type': document.file_type,
+        'file_size_display': _format_file_size(document.file_size),
+        'url': reverse('chatbot_download_document', args=[document.id]),
+    }
+
+
+def _pairwise_history_summary(messages, max_chars):
+    if not messages or max_chars <= 0:
+        return ''
+
+    summary_lines = []
+    pending_user_message = None
+
+    for message in messages:
+        if message.role == ChatMessage.USER:
+            pending_user_message = _truncate_for_history(message.content, 120)
+            continue
+
+        assistant_text = _truncate_for_history(message.content, 160)
+        if pending_user_message:
+            summary_lines.append(
+                f"- User asked about: {pending_user_message} | Assistant replied: {assistant_text}"
+            )
+            pending_user_message = None
+        else:
+            summary_lines.append(f"- Assistant replied: {assistant_text}")
+
+    if pending_user_message:
+        summary_lines.append(f"- User asked about: {pending_user_message}")
+
+    summary = "Earlier conversation summary:\n" + "\n".join(summary_lines)
+    if len(summary) <= max_chars:
+        return summary
+
+    trimmed_lines = []
+    current_length = len("Earlier conversation summary:\n")
+    for line in summary_lines:
+        line_length = len(line) + 1
+        if current_length + line_length > max_chars:
+            break
+        trimmed_lines.append(line)
+        current_length += line_length
+
+    if not trimmed_lines:
+        return _truncate_for_history(summary, max_chars)
+
+    return "Earlier conversation summary:\n" + "\n".join(trimmed_lines)
+
+
+def _build_history_prompt(messages):
+    max_recent_messages = max(getattr(settings, 'CHAT_HISTORY_MAX_RECENT_MESSAGES', 12), 0)
+    max_history_chars = max(getattr(settings, 'CHAT_HISTORY_MAX_CHARS', 6000), 0)
+    summary_char_budget = max(getattr(settings, 'CHAT_HISTORY_SUMMARY_MAX_CHARS', 1600), 0)
+
+    ordered_messages = list(messages)
+    if not ordered_messages or max_history_chars == 0:
+        return ''
+
+    recent_messages = ordered_messages[-max_recent_messages:] if max_recent_messages else []
+    older_messages = ordered_messages[:-max_recent_messages] if max_recent_messages else ordered_messages
+
+    sections = []
+    if older_messages and summary_char_budget:
+        sections.append(_pairwise_history_summary(older_messages, summary_char_budget))
+
+    if recent_messages:
+        recent_lines = [
+            f"{'User' if message.role == ChatMessage.USER else 'Assistant'}: "
+            f"{_truncate_for_history(message.content, 500)}"
+            for message in recent_messages
+        ]
+        sections.append("Recent conversation:\n" + "\n".join(recent_lines))
+
+    history_prompt = "\n\n".join(section for section in sections if section)
+    if len(history_prompt) <= max_history_chars:
+        return history_prompt
+
+    if recent_messages:
+        trimmed_recent_lines = []
+        recent_header_length = len("Recent conversation:\n")
+        reserved_length = 0
+        if older_messages and summary_char_budget:
+            older_summary = _pairwise_history_summary(
+                older_messages,
+                min(summary_char_budget, max_history_chars // 2),
+            )
+            sections = [older_summary] if older_summary else []
+            reserved_length = len("\n\n".join(sections)) + (2 if sections else 0)
+        else:
+            sections = []
+
+        current_length = reserved_length + recent_header_length
+        for line in reversed(recent_lines):
+            line_length = len(line) + 1
+            if current_length + line_length > max_history_chars:
+                break
+            trimmed_recent_lines.insert(0, line)
+            current_length += line_length
+
+        if trimmed_recent_lines:
+            sections.append("Recent conversation:\n" + "\n".join(trimmed_recent_lines))
+            return "\n\n".join(sections)
+
+    return _truncate_for_history(history_prompt, max_history_chars)
+
+
+def _format_file_size(bytes_size):
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.1f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.1f} TB"
+
+
+def _find_related_documents(user_message, limit=CHAT_DOCUMENT_RESULT_LIMIT):
+    document_intent_pattern = re.compile(
+        r'\b(document|documents|form|forms|template|templates|guideline|guidelines|file|files|pdf|docx|jpg|jpeg|png|download)\b',
+        re.IGNORECASE,
+    )
+    if not document_intent_pattern.search(user_message):
+        return []
+
+    keywords = [
+        word for word in re.findall(r'[a-zA-Z0-9]{3,}', user_message.lower())
+        if word not in {'the', 'and', 'for', 'with', 'from', 'that', 'this', 'need', 'send', 'show', 'give'}
+    ]
+
+    queryset = Document.objects.filter(status='active')
+    search_terms = keywords[:6]
+
+    if search_terms:
+        query = models.Q()
+        for term in search_terms:
+            query |= (
+                models.Q(title__icontains=term)
+                | models.Q(description__icontains=term)
+                | models.Q(category__icontains=term)
+                | models.Q(file_type__icontains=term)
+            )
+        queryset = queryset.filter(query)
+
+    return list(queryset.order_by('-download_count', '-updated_at')[:limit])
+
+
+def _document_context_for_prompt(documents):
+    if not documents:
+        return ''
+
+    lines = [
+        "Admin-uploaded documents available for this request:",
+    ]
+    for document in documents:
+        description = _truncate_for_history(document.description, 180) if document.description else 'No description provided.'
+        lines.append(
+            f"- Title: {document.title} | Type: {document.file_type} | Category: {document.category} | Description: {description}"
+        )
+
+    lines.append(
+        "If one or more of these documents match the user's request, answer that the document is available and mention that the relevant file is attached."
+    )
+    return "\n".join(lines)
 
 
 def _serialize_role_request(role_request):
@@ -525,6 +712,30 @@ def my_role_request_status(request):
     })
 
 
+@require_http_methods(["DELETE"])
+def delete_chat_session(request, session_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Unauthorized'}, status=401)
+
+    chat_session = ChatSession.objects.filter(
+        id=session_id,
+        user=request.user,
+    ).first()
+
+    if chat_session is None:
+        return JsonResponse({'success': False, 'error': 'Chat session not found.'}, status=404)
+
+    session_title = chat_session.title
+    chat_session.delete()
+    create_audit_log(
+        'Deleted Chat Session',
+        request.user.email,
+        f'Deleted chat session "{session_title}".',
+    )
+
+    return JsonResponse({'success': True, 'message': 'Chat session deleted successfully.'})
+
+
 def ask_gemini(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST requests are allowed.'}, status=405)
@@ -542,9 +753,14 @@ def ask_gemini(request):
 
         if not user_message:
             return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
+        if len(user_message) > MAX_CHAT_MESSAGE_LENGTH:
+            return JsonResponse({
+                'error': f'Message must be {MAX_CHAT_MESSAGE_LENGTH} characters or less.'
+            }, status=400)
 
         chat_session = None
-        history = []
+        history_prompt = ''
+        related_documents = _find_related_documents(user_message)
 
         if request.user.is_authenticated and session_id:
             chat_session = ChatSession.objects.filter(
@@ -555,16 +771,20 @@ def ask_gemini(request):
             if chat_session is None:
                 return JsonResponse({'error': 'Chat session not found.'}, status=404)
 
-            history = [
-                f"{'User' if message.role == ChatMessage.USER else 'Assistant'}: {message.content}"
-                for message in chat_session.messages.all()
-            ]
+            history_prompt = _build_history_prompt(chat_session.messages.all())
 
         prompt = user_message
-        if history:
-            prompt = "Conversation so far:\n" + "\n".join(history) + f"\nUser: {user_message}\nAssistant:"
+        if history_prompt:
+            prompt = f"{history_prompt}\nUser: {user_message}\nAssistant:"
 
-        response_cache_key = _response_cache_key(user_message, history)
+        if related_documents:
+            prompt = f"{_document_context_for_prompt(related_documents)}\n\n{prompt}"
+
+        response_cache_key = _response_cache_key(
+            user_message,
+            history_prompt,
+            document_ids=[document.id for document in related_documents],
+        )
         assistant_reply = cache.get(response_cache_key)
 
         if assistant_reply is None:
@@ -597,10 +817,13 @@ def ask_gemini(request):
                 session=chat_session,
                 role=ChatMessage.ASSISTANT,
                 content=assistant_reply,
+                attachments=[_serialize_chat_document(document) for document in related_documents],
             )
+            _touch_chat_session(chat_session)
 
         return JsonResponse({
             'response': assistant_reply,
+            'documents': [_serialize_chat_document(document) for document in related_documents],
             'session_id': chat_session.id if chat_session else None,
             'session_title': chat_session.title if chat_session else None,
             'session_url': reverse('chat_session', args=[chat_session.id]) if chat_session else None,
@@ -610,6 +833,21 @@ def ask_gemini(request):
         return JsonResponse({'error': 'Invalid JSON in request body.'}, status=400)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def download_chat_document(request, doc_id):
+    try:
+        doc = Document.objects.get(id=doc_id, status='active')
+        if not doc.file:
+            raise Http404("File not found.")
+
+        doc.download_count += 1
+        doc.save(update_fields=['download_count'])
+
+        return FileResponse(doc.file, as_attachment=True, filename=doc.file.name.split('/')[-1])
+    except Document.DoesNotExist:
+        raise Http404("Document not found.")
 
 
 def verify_otp(request):

@@ -120,11 +120,11 @@
             <div class="form-group">
                 <label for="docFile">File *</label>
                 <div class="file-upload">
-                    <input type="file" id="docFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" required>
+                    <input type="file" id="docFile" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg" required>
                     <div class="file-upload-area">
                         <span class="upload-icon-large">⬆️</span>
                         <p>Click to upload or drag and drop</p>
-                        <span class="file-formats">PDF, DOC, DOCX, XLS, XLSX (max.10MB)</span>
+                        <span class="file-formats">PDF, DOCX, PNG, JPG (max.5MB)</span>
                     </div>
                 </div>
             </div>
@@ -164,11 +164,11 @@
             <div class="form-group">
                 <label for="editDocFile">Replace File (Optional)</label>
                 <div class="file-upload">
-                    <input type="file" id="editDocFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                    <input type="file" id="editDocFile" name="file" accept=".pdf,.docx,.png,.jpg,.jpeg">
                     <div class="file-upload-area">
                         <span class="upload-icon-large">⬆️</span>
                         <p id="editFileAreaP">Click to upload or drag and drop to replace</p>
-                        <span class="file-formats">PDF, DOC, DOCX, XLS, XLSX (max.10MB)</span>
+                        <span class="file-formats">PDF, DOCX, PNG, JPG (max.5MB)</span>
                     </div>
                 </div>
             </div>
@@ -258,8 +258,28 @@ document.addEventListener('DOMContentLoaded', function() {
     const docFile = document.getElementById('docFile');
     const editDocFile = document.getElementById('editDocFile');
     const previewDownloadBtn = document.getElementById('downloadPreviewBtn');
+    const allowedDocumentExtensions = ['.pdf', '.docx', '.png', '.jpg', '.jpeg'];
+    const maxDocumentSizeBytes = 5 * 1024 * 1024;
 
     let currentDocId = null;
+
+    function validateDocumentFile(file) {
+        if (!file) {
+            return 'Please choose a file to upload.';
+        }
+
+        const lowerName = file.name.toLowerCase();
+        const isAllowed = allowedDocumentExtensions.some((extension) => lowerName.endsWith(extension));
+        if (!isAllowed) {
+            return 'Only PDF, DOCX, PNG, and JPG files are allowed.';
+        }
+
+        if (file.size > maxDocumentSizeBytes) {
+            return 'File exceeds the 5 MB limit.';
+        }
+
+        return '';
+    }
 
     async function fetchDocumentDetail(docId, trackView = false) {
         const suffix = trackView ? '?track_view=1' : '';
@@ -446,6 +466,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
     uploadForm.addEventListener('submit', function(e) {
         e.preventDefault();
+        const fileError = validateDocumentFile(docFile.files[0]);
+        if (fileError) {
+            showNotification(fileError, 'error');
+            return;
+        }
+
         const formData = new FormData(uploadForm);
         fetch('/dashboard/api/upload-document/', {
             method: 'POST',
@@ -472,6 +498,15 @@ document.addEventListener('DOMContentLoaded', function() {
     editForm.addEventListener('submit', function(e) {
         e.preventDefault();
         if (!currentDocId) return;
+
+        if (editDocFile.files[0]) {
+            const fileError = validateDocumentFile(editDocFile.files[0]);
+            if (fileError) {
+                showNotification(fileError, 'error');
+                return;
+            }
+        }
+
         const formData = new FormData(editForm);
         fetch('/dashboard/api/update-document/' + currentDocId + '/', {
             method: 'POST',

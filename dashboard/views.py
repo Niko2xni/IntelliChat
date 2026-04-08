@@ -19,10 +19,28 @@ from .models import (
 )
 import json
 
+MAX_DOCUMENT_SIZE_BYTES = 5 * 1024 * 1024
+ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'docx', 'png', 'jpg', 'jpeg'}
+
 
 def is_admin(user):
     """Check if the user is an active administrator."""
     return user.is_active and user.is_staff
+
+
+def _validate_document_upload(file):
+    if not file:
+        return 'No file provided'
+
+    extension = file.name.rsplit('.', 1)[-1].lower() if '.' in file.name else ''
+    if extension not in ALLOWED_DOCUMENT_EXTENSIONS:
+        allowed = ', '.join(sorted(ALLOWED_DOCUMENT_EXTENSIONS))
+        return f'Unsupported file type. Allowed types: {allowed}.'
+
+    if file.size > MAX_DOCUMENT_SIZE_BYTES:
+        return 'File exceeds the 5 MB limit.'
+
+    return None
 
 
 @user_passes_test(is_admin, login_url='login')
@@ -318,9 +336,10 @@ def upload_document(request):
         title = request.POST.get('title')
         category = request.POST.get('category', 'other')
         file = request.FILES.get('file')
-        
-        if not file:
-            return JsonResponse({'status': 'error', 'message': 'No file provided'}, status=400)
+
+        validation_error = _validate_document_upload(file)
+        if validation_error:
+            return JsonResponse({'status': 'error', 'message': validation_error}, status=400)
         
         # Get file extension
         file_name = file.name
@@ -390,6 +409,10 @@ def update_document(request, doc_id):
         doc.category = category
 
         if file:
+            validation_error = _validate_document_upload(file)
+            if validation_error:
+                return JsonResponse({'status': 'error', 'message': validation_error}, status=400)
+
             # Delete old file safely
             if doc.file:
                 doc.file.delete(save=False)

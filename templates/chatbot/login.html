@@ -22,7 +22,9 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
 <!-- LOGO -->
 
 <div class="logo-section">
+    <a href="{% url 'home' %}">
     <img src="{% static 'images/logo.png' %}" class="auth-logo" alt="IntelliChat Logo">
+    </a>
 </div>
 
 <!-- LOGIN CARD -->
@@ -89,7 +91,8 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
             <!-- REGISTER TEXT -->
             <div class="auth-footer">
                 <p>Don't have an account yet? 
-                <a href="{% url 'signup' %}" class="auth-link">Register here</a></p>
+                <a href="{% url 'signup' %}" class="auth-link">Register here</a><br><br>
+                <a href="{% url 'home' %}" class="auth-link">Go back to Home</a></p>
             </div>
 
 
