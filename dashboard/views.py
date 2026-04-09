@@ -864,4 +864,3 @@ def manage_role_request(request, req_id):
     ).update(is_read=True)
 
     return JsonResponse({'status': 'success', 'message': f'Request {action}ed successfully.'})
-

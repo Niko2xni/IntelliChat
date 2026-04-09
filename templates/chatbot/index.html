@@ -1,609 +1,199 @@
+{% extends 'dashboard/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html>
-<head>
-    <title>IntelliChat</title>
 
-    <link rel="stylesheet" href="{% static 'css/chatbot.css' %}">
-    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
+{% block title %}Admin Dashboard - IntelliChat{% endblock %}
 
-<body>
-
-<header class="header">
-    <div class="header-content">
-        <div class="menu-icon">
-            <i class="fas fa-bars"></i>
-        </div>
-
-        <h1 class="logo">
-            <img src="{% static 'images/logo.png' %}">
-        </h1>
-
-        <div class="header-icons">
-            <div class="notification-wrapper">
-                <button class="header-icon notif-icon notification-btn" title="Notifications">
-                    <i class="fas fa-bell"></i>
-                    <span class="notif-badge" style="display: none;">0</span>
-                </button>
-
-                <div id="notificationDropdown" class="notification-dropdown" style="display: none;">
-                    <div class="notification-header">
-                        <h3>Notifications</h3>
-                        <button id="markAllReadBtn" class="mark-all-read-btn">Mark all as read</button>
-                    </div>
-                    <div class="notification-list">
-                    </div>
-                </div>
-            </div>
-
-            <a href="{% url 'profile' %}" class="header-icon profile-icon">
-                {% if user.is_authenticated and user.profile_picture %}
-                <img src="{{ user.profile_picture.url }}" alt="Profile">
-                {% else %}
-                <img src="{% static 'images/profile.png' %}" alt="Profile">
-                {% endif %}
-            </a>
-        </div>
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>Admin Dashboard</h2>
+        <p class="subtitle">Overview of IntelliChat system performance</p>
     </div>
-</header>
-
-<div class="main-container">
-    <aside class="sidebar">
-        <div class="sidebar-item active" id="newChatButton">
-            <i class="fas fa-plus"></i>
-            <span>New chat</span>
-        </div>
-
-        <a href="{% url 'chatbot_faqs' %}" class="sidebar-item">
-            <i class="fas fa-circle-question"></i>
-            <span>FAQs</span>
-        </a>
-
-        <div class="sidebar-section">
-            <div class="sidebar-section-header">
-                <div class="sidebar-section-title">Recent chats</div>
-                {% if user.is_authenticated %}
-                <span class="sidebar-session-count">{{ chat_session_summaries|length }}</span>
-                {% endif %}
+    
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-header">
+                <h3>Total Chats</h3>
+                <span class="metric-icon">💬</span>
             </div>
-
-            {% if user.is_authenticated %}
-                <div class="sidebar-chat-list">
-                {% for session in chat_session_summaries %}
-                <div
-                    class="sidebar-chat-link{% if current_session and current_session.id == session.id %} current{% endif %}"
-                    data-session-id="{{ session.id }}"
-                >
-                    <a
-                        href="{% url 'chat_session' session.id %}"
-                        class="sidebar-chat-main"
-                    >
-                        <div class="sidebar-chat-title-row">
-                            <span class="sidebar-chat-title">{{ session.title }}</span>
-                            <time class="sidebar-chat-time" datetime="{{ session.updated_iso }}">{{ session.updated_label }}</time>
-                        </div>
-                        <p class="sidebar-chat-preview">{{ session.preview }}</p>
-                    </a>
-                    <button
-                        type="button"
-                        class="sidebar-chat-delete"
-                        data-session-id="{{ session.id }}"
-                        data-session-title="{{ session.title|escape }}"
-                        aria-label="Delete {{ session.title }}"
-                        title="Delete chat"
-                    >
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                {% empty %}
-                <div class="sidebar-empty">No saved chats yet.</div>
-                {% endfor %}
-                </div>
-            {% else %}
-            <div class="sidebar-empty">Log in to save your chat sessions.</div>
-            {% endif %}
-        </div>
-    </aside>
-
-    <main class="chat-area">
-        <div class="welcome-screen" id="welcomeScreen"{% if current_session %} style="display: none;"{% endif %}>
-            <div class="welcome-message">
-                {% if user.is_authenticated %}
-                <h3>Hi, {{ user.first_name }}</h3>
-                {% else %}
-                <h3>Hi, Guest</h3>
-                {% endif %}
-                <h1>How can we help?</h1>
-            </div>
-
-            <div class="chat-input-container">
-                <input type="text" class="chat-input" id="welcomeInput" placeholder="Ask anything" maxlength="500">
-                <div class="send-button" id="welcomeSendBtn">
-                    <i class="fas fa-paper-plane"></i>
-                </div>
+            <div class="metric-value">{{ metrics.total_chats }}</div>
+            <div class="metric-change {% if metrics.chats_change >= 0 %}positive{% else %}negative{% endif %}">
+                <span class="arrow">{% if metrics.chats_change >= 0 %}📈{% else %}📉{% endif %}</span>
+                <span class="percentage">{{ metrics.chats_change|floatformat:1 }}%</span>
+                <span class="period">from last week</span>
             </div>
         </div>
-
-        <div class="active-chat" id="activeChat"{% if not current_session %} style="display: none;"{% endif %}>
-            <div class="chat-session-header">
-                <h2 id="chatSessionTitle">
-                    {% if current_session %}
-                    {{ current_session.title }}
-                    {% else %}
-                    New chat
-                    {% endif %}
-                </h2>
-                <p class="chat-session-meta" id="chatSessionMeta">
-                    {% if current_messages %}
-                    {{ current_messages|length }} messages in this chat
-                    {% else %}
-                    No messages yet
-                    {% endif %}
-                </p>
+        
+        <div class="metric-card">
+            <div class="metric-header">
+                <h3>Active Users</h3>
+                <span class="metric-icon">👥</span>
             </div>
-
-            <div class="chat-messages" id="chatMessages"></div>
-
-            <div class="chat-input-wrapper">
-                <div class="chat-input-container">
-                    <input type="text" class="chat-input" id="chatInputActive" placeholder="Ask anything" maxlength="500">
-                    <div class="send-button" id="activeSendBtn">
-                        <i class="fas fa-paper-plane"></i>
-                    </div>
-                </div>
-                <div class="rate-limit-note" id="chatStatusMessage"></div>
+            <div class="metric-value">{{ metrics.active_users }}</div>
+            <div class="metric-change {% if metrics.users_change >= 0 %}positive{% else %}negative{% endif %}">
+                <span class="arrow">{% if metrics.users_change >= 0 %}📈{% else %}📉{% endif %}</span>
+                <span class="percentage">{{ metrics.users_change|floatformat:1 }}%</span>
+                <span class="period">from last week</span>
             </div>
         </div>
-    </main>
+        
+    </div>
+    
+<div class="charts-grid">
+    <div class="chart-container">
+        <h3>Common Inquiries of the Month</h3>
+        <canvas id="inquiriesChart"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h3>Average Response Time Over Time</h3>
+        <canvas id="combinedChart"></canvas>
+    </div>
+</div>
+    
+<div class="inquiries-section">
+    <h3>2nd Semester, S.Y. 2025-2026 - Top Inquiries</h3>
+    <div class="pie-wrapper">
+        <div class="pie-chart-container">
+            <canvas id="inquiriesPieChart"></canvas>
+        </div>
+        
+        <ul class="pie-info-list">
+            {% for inquiry, color in inquiry_items %}
+            <li class="pie-info-item" style="--legend-color: {{ color }};" title="{{ inquiry.description|default:'Common system query' }}">
+                <div class="pie-info-text">
+                    <span class="pie-info-title">{{ inquiry.title }}</span>
+                    <span class="pie-info-desc">{{ inquiry.description|default:'Common system query' }}</span>
+                </div>
+                <span class="count-badge">{{ inquiry.count }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
 </div>
 
-<dialog class="chat-delete-dialog" id="chatDeleteDialog">
-    <form method="dialog" class="chat-delete-dialog-form">
-        <h3>Delete Chat</h3>
-        <p id="chatDeleteMessage">Are you sure you want to delete this chat?</p>
-        <div class="chat-delete-actions">
-            <button type="button" class="chat-delete-cancel" id="chatDeleteCancel">Cancel</button>
-            <button type="submit" class="chat-delete-confirm" id="chatDeleteConfirm" value="confirm">Delete</button>
-        </div>
-    </form>
-</dialog>
+    <!-- json data for chart/legend (hidden) -->
+    {{ inquiry_labels|json_script:"inquiryLabels" }}
+    {{ inquiry_counts|json_script:"inquiryCounts" }}
+    {{ inquiry_colors|json_script:"inquiryColors" }}
+    {{ response_time_labels|json_script:"responseTimeLabels" }}
+    {{ response_time_values|json_script:"responseTimeValues" }}
 
-{{ current_messages|json_script:"initial-chat-messages" }}
 <script>
-const welcomeScreen = document.getElementById('welcomeScreen');
-const activeChat = document.getElementById('activeChat');
-const chatMessages = document.getElementById('chatMessages');
-const welcomeInput = document.getElementById('welcomeInput');
-const welcomeSendBtn = document.getElementById('welcomeSendBtn');
-const chatInputActive = document.getElementById('chatInputActive');
-const activeSendBtn = document.getElementById('activeSendBtn');
-const menuIcon = document.querySelector('.menu-icon');
-const sidebar = document.querySelector('.sidebar');
-const chatArea = document.querySelector('.chat-area');
-const newChatButton = document.getElementById('newChatButton');
-const chatSessionTitle = document.getElementById('chatSessionTitle');
-const chatSessionMeta = document.getElementById('chatSessionMeta');
-const chatStatusMessage = document.getElementById('chatStatusMessage');
-const chatListContainer = document.querySelector('.sidebar-chat-list');
-const sessionCountBadge = document.querySelector('.sidebar-session-count');
-const chatDeleteDialog = document.getElementById('chatDeleteDialog');
-const chatDeleteMessage = document.getElementById('chatDeleteMessage');
-const chatDeleteCancel = document.getElementById('chatDeleteCancel');
-const MAX_PROMPT_LENGTH = 500;
+console.log('dashboard inline script executing');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOMContentLoaded handler started');
+    
+    const inquiryLabels = JSON.parse(document.getElementById('inquiryLabels').textContent);
+    const inquiryCounts = JSON.parse(document.getElementById('inquiryCounts').textContent);
+    const inquiryColors = JSON.parse(document.getElementById('inquiryColors').textContent);
 
-let chatStarted = {% if current_session %}true{% else %}false{% endif %};
-let currentSessionId = {% if current_session %}{{ current_session.id }}{% else %}null{% endif %};
-let messageCount = 0;
-let pendingDeleteSession = null;
-
-function switchToActiveChat() {
-    if (!chatStarted) {
-        chatStarted = true;
-        welcomeScreen.style.display = 'none';
-        activeChat.style.display = 'flex';
-    }
-    chatInputActive.focus();
-}
-
-function formatTimeLabel(dateValue) {
-    return dateValue.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function escapeHtml(value) {
-    return value
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-}
-
-function truncateText(text, maxLength = 80) {
-    if (text.length <= maxLength) {
-        return text;
-    }
-    return `${text.slice(0, maxLength - 3).trimEnd()}...`;
-}
-
-function updateSessionMeta() {
-    if (!chatSessionMeta) {
-        return;
-    }
-
-    if (messageCount === 0) {
-        chatSessionMeta.textContent = 'No messages yet';
-        return;
-    }
-
-    const noun = messageCount === 1 ? 'message' : 'messages';
-    chatSessionMeta.textContent = `${messageCount} ${noun} in this chat`;
-}
-
-function addMessage(text, sender, timeLabel = null, documents = []) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `chat-bubble ${sender}`;
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'chat-bubble-content';
-    contentDiv.textContent = text;
-    msgDiv.appendChild(contentDiv);
-
-    if (documents.length) {
-        const docsDiv = document.createElement('div');
-        docsDiv.className = 'chat-bubble-documents';
-
-        documents.forEach((doc) => {
-            const link = document.createElement('a');
-            link.className = 'chat-document-link';
-            link.href = doc.url;
-            link.textContent = `${doc.title} (${doc.file_type}, ${doc.file_size_display})`;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            docsDiv.appendChild(link);
-        });
-
-        msgDiv.appendChild(docsDiv);
-    }
-
-    if (timeLabel) {
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'chat-bubble-time';
-        timeDiv.textContent = timeLabel;
-        msgDiv.appendChild(timeDiv);
-    }
-
-    chatMessages.appendChild(msgDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    if (!sender.includes('typing')) {
-        messageCount += 1;
-        updateSessionMeta();
-    }
-
-    return msgDiv;
-}
-
-function renderSavedMessages() {
-    const saved = JSON.parse(document.getElementById('initial-chat-messages').textContent);
-    messageCount = 0;
-    saved.forEach((message) => {
-        addMessage(
-            message.content,
-            message.role === 'user' ? 'user' : 'bot',
-            message.time_label || null,
-            message.attachments || [],
-        );
-    });
-    updateSessionMeta();
-}
-
-function setStatusMessage(message, isError = false) {
-    chatStatusMessage.textContent = message || '';
-    chatStatusMessage.classList.toggle('error', isError);
-}
-
-function validatePrompt(message) {
-    if (!message) {
-        return 'Message cannot be empty.';
-    }
-
-    if (message.length > MAX_PROMPT_LENGTH) {
-        return `Message must be ${MAX_PROMPT_LENGTH} characters or less.`;
-    }
-
-    return '';
-}
-
-function clearActiveSidebarState() {
-    document.querySelectorAll('.sidebar-chat-link').forEach((link) => {
-        link.classList.remove('current');
-    });
-}
-
-function updateSessionCount(delta) {
-    if (!sessionCountBadge) {
-        return;
-    }
-
-    const currentCount = Number.parseInt(sessionCountBadge.textContent || '0', 10);
-    const nextCount = Math.max((Number.isNaN(currentCount) ? 0 : currentCount) + delta, 0);
-    sessionCountBadge.textContent = String(nextCount);
-}
-
-function ensureSidebarEmptyState() {
-    const list = chatListContainer || document.querySelector('.sidebar-chat-list');
-    if (!list || list.querySelector('.sidebar-chat-link')) {
-        return;
-    }
-
-    if (!document.querySelector('.sidebar-empty')) {
-        const emptyState = document.createElement('div');
-        emptyState.className = 'sidebar-empty';
-        emptyState.textContent = 'No saved chats yet.';
-        list.parentElement.appendChild(emptyState);
-    }
-}
-
-function openDeleteDialog(sessionId, sessionTitle, button) {
-    pendingDeleteSession = { sessionId, sessionTitle, button };
-    chatDeleteMessage.textContent = `Delete "${sessionTitle}"?`;
-    chatDeleteDialog.showModal();
-}
-
-function attachDeleteHandlers(scope = document) {
-    scope.querySelectorAll('.sidebar-chat-delete').forEach((button) => {
-        if (button.dataset.deleteBound === 'true') {
-            return;
-        }
-
-        button.dataset.deleteBound = 'true';
-        button.addEventListener('click', async (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-
-            const sessionId = button.dataset.sessionId;
-            const sessionTitle = button.dataset.sessionTitle || 'this chat';
-            openDeleteDialog(sessionId, sessionTitle, button);
-        });
-    });
-}
-
-function addSessionToSidebar(sessionId, title, url, latestPreview = '') {
-    let existing = document.querySelector(`.sidebar-chat-link[data-session-id="${sessionId}"]`);
-
-    const safeTitle = escapeHtml(title || 'Saved chat');
-    const cleanPreview = truncateText((latestPreview || '').trim() || 'New conversation started.');
-    const safePreview = escapeHtml(cleanPreview);
-    const nowLabel = formatTimeLabel(new Date());
-
-    if (existing) {
-        existing.querySelector('.sidebar-chat-title').textContent = title || 'Saved chat';
-        const existingPreview = existing.querySelector('.sidebar-chat-preview');
-        if (existingPreview && cleanPreview) {
-            existingPreview.textContent = cleanPreview;
-        }
-        const existingTime = existing.querySelector('.sidebar-chat-time');
-        if (existingTime) {
-            existingTime.textContent = nowLabel;
-            existingTime.dateTime = new Date().toISOString();
-        }
-        const existingDeleteButton = existing.querySelector('.sidebar-chat-delete');
-        if (existingDeleteButton) {
-            existingDeleteButton.dataset.sessionTitle = title || 'Saved chat';
-            existingDeleteButton.setAttribute('aria-label', `Delete ${title || 'Saved chat'}`);
-        }
-
-        clearActiveSidebarState();
-        existing.classList.add('current');
-        existing.parentElement.prepend(existing);
-        return;
-    }
-
-    const emptyState = document.querySelector('.sidebar-empty');
-    if (emptyState) {
-        emptyState.remove();
-    }
-
-    const link = document.createElement('div');
-    link.className = 'sidebar-chat-link current';
-    link.dataset.sessionId = sessionId;
-    link.innerHTML = `
-        <a href="${url}" class="sidebar-chat-main">
-            <div class="sidebar-chat-title-row">
-                <span class="sidebar-chat-title">${safeTitle}</span>
-                <time class="sidebar-chat-time" datetime="${new Date().toISOString()}">${nowLabel}</time>
-            </div>
-            <p class="sidebar-chat-preview">${safePreview}</p>
-        </a>
-        <button
-            type="button"
-            class="sidebar-chat-delete"
-            data-session-id="${sessionId}"
-            data-session-title="${safeTitle}"
-            aria-label="Delete ${safeTitle}"
-            title="Delete chat"
-        >
-            <span aria-hidden="true">&times;</span>
-        </button>
-    `;
-
-    const list = chatListContainer || document.querySelector('.sidebar-chat-list') || document.querySelector('.sidebar-section');
-    const firstLink = list.querySelector('.sidebar-chat-link');
-    clearActiveSidebarState();
-    if (firstLink) {
-        list.insertBefore(link, firstLink);
-    } else {
-        list.appendChild(link);
-    }
-
-    updateSessionCount(1);
-    attachDeleteHandlers(link);
-}
-
-function resetToNewChat() {
-    currentSessionId = null;
-    chatStarted = false;
-    messageCount = 0;
-    chatMessages.innerHTML = '';
-    welcomeScreen.style.display = 'flex';
-    activeChat.style.display = 'none';
-    chatSessionTitle.textContent = 'New chat';
-    updateSessionMeta();
-    setStatusMessage('');
-    clearActiveSidebarState();
-    history.replaceState({}, '', '{% url "chatbot_home" %}');
-}
-
-async function sendMessage(inputEl) {
-    const message = inputEl.value.trim();
-    const validationError = validatePrompt(message);
-
-    if (validationError) {
-        setStatusMessage(validationError, true);
-        return;
-    }
-
-    switchToActiveChat();
-    setStatusMessage('');
-    addMessage(message, 'user', formatTimeLabel(new Date()));
-    welcomeInput.value = '';
-    chatInputActive.value = '';
-
-    const typingDiv = addMessage('Thinking...', 'bot typing');
-
-    try {
-        const response = await fetch('{% url "ask_gemini" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken(),
+    // 1. Bar Chart: Common Inquiries
+    const inquiriesCanvas = document.getElementById('inquiriesChart');
+    if (inquiriesCanvas) {
+        const inquiriesCtx = inquiriesCanvas.getContext('2d');
+        new Chart(inquiriesCtx, {
+            type: 'bar',
+            data: {
+                labels: inquiryLabels,
+                datasets: [{
+                    label: 'Inquiries',
+                    data: inquiryCounts,
+                    backgroundColor: inquiryColors,
+                    borderColor: inquiryColors,
+                    borderRadius: 5
+                }]
             },
-            body: JSON.stringify({
-                message,
-                session_id: currentSessionId,
-            }),
-        });
-
-        const data = await response.json();
-        typingDiv.remove();
-
-        if (!response.ok) {
-            const errorMessage = data.error || 'Something went wrong. Please try again.';
-            setStatusMessage(errorMessage, true);
-            addMessage(errorMessage, 'bot error', formatTimeLabel(new Date()));
-            return;
-        }
-
-        if (data.response) {
-            addMessage(data.response, 'bot', formatTimeLabel(new Date()), data.documents || []);
-
-            if (data.session_id) {
-                currentSessionId = data.session_id;
-                chatSessionTitle.textContent = data.session_title || 'Saved chat';
-                addSessionToSidebar(data.session_id, data.session_title || 'Saved chat', data.session_url, message);
-                if (data.session_url) {
-                    history.replaceState({}, '', data.session_url);
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
                 }
             }
-        }
-    } catch (err) {
-        typingDiv.remove();
-        setStatusMessage('Something went wrong. Please try again.', true);
-        addMessage('Something went wrong. Please try again.', 'bot error', formatTimeLabel(new Date()));
-    }
-}
-
-function getCsrfToken() {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-        const [name, value] = cookie.trim().split('=');
-        if (name === 'csrftoken') return value;
-    }
-    return '';
-}
-
-welcomeSendBtn.addEventListener('click', () => sendMessage(welcomeInput));
-welcomeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage(welcomeInput);
-});
-
-activeSendBtn.addEventListener('click', () => sendMessage(chatInputActive));
-chatInputActive.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage(chatInputActive);
-});
-
-newChatButton.addEventListener('click', resetToNewChat);
-
-menuIcon.addEventListener('click', () => {
-    sidebar.classList.toggle('hidden');
-    chatArea.classList.toggle('full-width');
-});
-
-[welcomeInput, chatInputActive].forEach((input) => {
-    input.addEventListener('input', () => {
-        const message = input.value.trim();
-        const validationError = validatePrompt(message);
-
-        if (!message) {
-            setStatusMessage('');
-            return;
-        }
-
-        setStatusMessage(validationError, Boolean(validationError));
-    });
-});
-
-chatDeleteCancel.addEventListener('click', () => {
-    pendingDeleteSession = null;
-    chatDeleteDialog.close();
-});
-
-chatDeleteDialog.addEventListener('close', async () => {
-    if (chatDeleteDialog.returnValue !== 'confirm' || !pendingDeleteSession) {
-        pendingDeleteSession = null;
-        return;
-    }
-
-    const { sessionId, button } = pendingDeleteSession;
-    pendingDeleteSession = null;
-
-    try {
-        const response = await fetch(`/chatbot/sessions/${sessionId}/delete/`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-            },
         });
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            setStatusMessage(data.error || 'Failed to delete chat session.', true);
-            return;
-        }
-
-        const sessionItem = button.closest('.sidebar-chat-link');
-        if (sessionItem) {
-            sessionItem.remove();
-        }
-        updateSessionCount(-1);
-        ensureSidebarEmptyState();
-        setStatusMessage(data.message || 'Chat session deleted successfully.');
-
-        if (String(currentSessionId) === String(sessionId)) {
-            resetToNewChat();
-        }
-    } catch (error) {
-        setStatusMessage('Failed to delete chat session.', true);
     }
+    
+    const responseTimeLabels = JSON.parse(document.getElementById('responseTimeLabels').textContent);
+    const responseTimeValues = JSON.parse(document.getElementById('responseTimeValues').textContent);
+
+    const combinedCanvas = document.getElementById('combinedChart');
+    if (combinedCanvas) {
+        const combinedCtx = combinedCanvas.getContext('2d');
+        new Chart(combinedCtx, {
+            type: 'bar',
+            data: {
+                labels: responseTimeLabels,
+                datasets: [{
+                    label: 'Average Response Time (s)',
+                    data: responseTimeValues,
+                    backgroundColor: 'rgba(255, 165, 0, 0.4)',
+                    borderColor: '#FFA500',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Average Response Time (s)' }
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Pie Chart: Dynamic Top Inquiries
+    const pieCanvas = document.getElementById('inquiriesPieChart');
+    if (pieCanvas) {
+        const pieCtx = pieCanvas.getContext('2d');
+        let labels = [];
+        let counts = [];
+        let colors = [];
+        try {
+            labels = JSON.parse(document.getElementById('inquiryLabels').textContent);
+            counts = JSON.parse(document.getElementById('inquiryCounts').textContent);
+            colors = JSON.parse(document.getElementById('inquiryColors').textContent);
+        } catch (err) {
+            console.error('Error parsing pie chart data:', err);
+        }
+        console.log('Pie chart data', {labels, counts, colors});
+        if (labels.length && counts.length) {
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    console.log('dashboard scripts finished');
 });
-
-attachDeleteHandlers();
-renderSavedMessages();
 </script>
-
-<script src="{% static 'js/notifications.js' %}"></script>
-
-</body>
-</html>
+{% endblock %}
