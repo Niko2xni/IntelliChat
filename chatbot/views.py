@@ -18,7 +18,7 @@ from django.views.decorators.http import require_http_methods
 from google import genai
 
 from .models import ChatMessage, ChatSession, Student
-from dashboard.models import Document, FAQ, Notification, RoleRequest, create_audit_log, create_notification
+from dashboard.models import Document, FAQ, Notification, RoleRequest, create_notification
 
 SYSTEM_PROMPT = """
 You are the T.I.P. Office of Student Affairs (OSA) Virtual Assistant.
@@ -686,12 +686,6 @@ def submit_role_request(request):
             position=position,
             organization=organization,
         )
-        create_audit_log(
-            'Submitted Student Leader request',
-            request.user.email,
-            f'Submitted role request for {organization} as {position}.',
-        )
-
         requester_display = request.user.get_full_name() or request.user.username or request.user.email
         admin_message = (
             f'{requester_display} submitted a Student Leader role request '
@@ -767,13 +761,7 @@ def delete_chat_session(request, session_id):
     if chat_session is None:
         return JsonResponse({'success': False, 'error': 'Chat session not found.'}, status=404)
 
-    session_title = chat_session.title
     chat_session.delete()
-    create_audit_log(
-        'Deleted Chat Session',
-        request.user.email,
-        f'Deleted chat session "{session_title}".',
-    )
 
     return JsonResponse({'success': True, 'message': 'Chat session deleted successfully.'})
 
@@ -1022,12 +1010,6 @@ def update_password(request):
             request.user.set_password(password)
             request.user.save()
             update_session_auth_hash(request, request.user)
-            create_audit_log(
-                'Changed Password',
-                request.user.email,
-                'User changed their password through profile settings.',
-            )
-
             request.session.pop('password_change_otp', None)
             request.session.pop('password_change_otp_timestamp', None)
             request.session.pop('password_change_otp_verified', None)
@@ -1089,11 +1071,6 @@ def confirm_delete_account(request):
                 email = user.email
                 logout(request)
                 user.delete()
-                create_audit_log(
-                    'Deleted Account',
-                    email,
-                    'User deleted their account through profile settings.',
-                )
                 request.session.pop('delete_account_otp', None)
                 request.session.pop('delete_account_otp_timestamp', None)
                 return JsonResponse({'success': True})
@@ -1125,12 +1102,6 @@ def upload_profile_picture(request):
 
             request.user.profile_picture = profile_picture
             request.user.save()
-            create_audit_log(
-                'Updated Profile Picture',
-                request.user.email,
-                'User uploaded a new profile picture.',
-            )
-
             return JsonResponse({
                 'success': True,
                 'image_url': request.user.profile_picture.url

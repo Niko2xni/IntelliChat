@@ -1,12 +1,17 @@
 from datetime import timedelta
+import json
+import shutil
+import tempfile
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from chatbot.models import ChatMessage, ChatSession, Student
 
-from .models import DashboardMetrics
+from .models import AuditLog, DashboardMetrics, Document, FAQ
 
 
 def _create_chat_session(user, title, created_at, response_seconds):
@@ -193,3 +198,72 @@ class APITests(TestCase):
         self.assertIn('data', response.json())
         self.assertEqual(response.json()['labels'][0], 'Where is OSA office located')
         self.assertEqual(response.json()['data'][0], 2)
+
+
+@override_settings()
+class AdminLoggingAndDocumentTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._temp_media_root = tempfile.mkdtemp()
+        cls._override = override_settings(MEDIA_ROOT=cls._temp_media_root)
+        cls._override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls._override.disable()
+        shutil.rmtree(cls._temp_media_root, ignore_errors=True)
+
+    def setUp(self):
+        self.admin_user = Student.objects.create_user(
+            email='admin-logging@example.com',
+            username='admin-logging',
+            password='password123',
+            first_name='Admin',
+            last_name='Logger',
+        )
+        self.admin_user.is_staff = True
+        self.admin_user.is_active = True
+        self.admin_user.save(update_fields=['is_staff', 'is_active'])
+        self.client.force_login(self.admin_user)
+
+    def test_add_faq_creates_admin_audit_log(self):
+        response = self.client.post(
+            reverse('dashboard:add_faq'),
+            data=json.dumps({
+                'question': 'Where is the registrar?',
+                'answer': 'At Founders Hall.',
+                'tags': 'registrar,location',
+                'category': 'general',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(FAQ.objects.filter(question='Where is the registrar?').exists())
+        self.assertTrue(AuditLog.objects.filter(action='Added FAQ', actor_email=self.admin_user.email).exists())
+
+    def test_duplicate_pdf_upload_is_rejected(self):
+        Document.objects.create(
+            title='Existing Manual',
+            description='Original document',
+            file=SimpleUploadedFile('existing-manual.pdf', b'same-pdf-content', content_type='application/pdf'),
+            file_type='PDF',
+            file_size=len(b'same-pdf-content'),
+            category='guidelines',
+            status='active',
+        )
+
+        response = self.client.post(
+            reverse('dashboard:upload_document'),
+            data={
+                'title': 'Duplicate Manual',
+                'category': 'guidelines',
+                'file': SimpleUploadedFile('duplicate-manual.pdf', b'same-pdf-content', content_type='application/pdf'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Duplicate file detected.', response.json()['message'])
+        self.assertEqual(Document.objects.count(), 1)

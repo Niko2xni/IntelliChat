@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
+from hashlib import sha256
 
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -41,6 +42,53 @@ def _validate_document_upload(file):
 
     if file.size > MAX_DOCUMENT_SIZE_BYTES:
         return 'File exceeds the 5 MB limit.'
+
+    return None
+
+
+def _file_extension(file_name):
+    return file_name.rsplit('.', 1)[-1].lower() if '.' in file_name else ''
+
+
+def _file_digest(file_obj):
+    hasher = sha256()
+    current_position = file_obj.tell() if hasattr(file_obj, 'tell') else None
+
+    if hasattr(file_obj, 'seek'):
+        file_obj.seek(0)
+
+    for chunk in file_obj.chunks() if hasattr(file_obj, 'chunks') else iter(lambda: file_obj.read(8192), b''):
+        hasher.update(chunk)
+
+    if hasattr(file_obj, 'seek'):
+        file_obj.seek(0 if current_position is None else current_position)
+
+    return hasher.hexdigest()
+
+
+def _find_duplicate_document(uploaded_file, exclude_doc_id=None):
+    extension = _file_extension(uploaded_file.name)
+    if extension not in {'pdf', 'docx'}:
+        return None
+
+    uploaded_digest = _file_digest(uploaded_file)
+    candidates = Document.objects.filter(
+        status__in=['active', 'draft'],
+        file_type__iexact=extension,
+        file_size=uploaded_file.size,
+    )
+    if exclude_doc_id is not None:
+        candidates = candidates.exclude(id=exclude_doc_id)
+
+    for candidate in candidates:
+        if not candidate.file:
+            continue
+
+        with candidate.file.open('rb') as existing_file:
+            existing_digest = _file_digest(existing_file)
+
+        if existing_digest == uploaded_digest:
+            return candidate
 
     return None
 
@@ -341,6 +389,11 @@ def add_faq(request):
             tags=data['tags'],
             category=data.get('category', 'general')
         )
+        create_audit_log(
+            'Added FAQ',
+            request.user.email,
+            f'Added FAQ "{faq.question}" in category "{faq.category}".',
+        )
         return JsonResponse({
             'status': 'success',
             'message': 'FAQ added successfully',
@@ -364,6 +417,11 @@ def update_faq(request, faq_id):
         faq.tags = data['tags']
         faq.category = data.get('category', faq.category)
         faq.save()
+        create_audit_log(
+            'Updated FAQ',
+            request.user.email,
+            f'Updated FAQ "{faq.question}" in category "{faq.category}".',
+        )
         
         return JsonResponse({'status': 'success', 'message': 'FAQ updated successfully'})
     except FAQ.DoesNotExist:
@@ -379,8 +437,14 @@ def delete_faq(request, faq_id):
     """API endpoint to delete an FAQ."""
     try:
         faq = FAQ.objects.get(id=faq_id)
+        question = faq.question
         faq.is_active = False  # Soft delete
         faq.save()
+        create_audit_log(
+            'Deleted FAQ',
+            request.user.email,
+            f'Deleted FAQ "{question}".',
+        )
         return JsonResponse({'status': 'success', 'message': 'FAQ deleted successfully'})
     except FAQ.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'FAQ not found'}, status=404)
@@ -464,6 +528,13 @@ def upload_document(request):
         validation_error = _validate_document_upload(file)
         if validation_error:
             return JsonResponse({'status': 'error', 'message': validation_error}, status=400)
+
+        duplicate_document = _find_duplicate_document(file)
+        if duplicate_document is not None:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Duplicate file detected. This matches the existing document "{duplicate_document.title}".',
+            }, status=400)
         
         # Get file extension
         file_name = file.name
@@ -536,6 +607,13 @@ def update_document(request, doc_id):
             validation_error = _validate_document_upload(file)
             if validation_error:
                 return JsonResponse({'status': 'error', 'message': validation_error}, status=400)
+
+            duplicate_document = _find_duplicate_document(file, exclude_doc_id=doc.id)
+            if duplicate_document is not None:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Duplicate file detected. This matches the existing document "{duplicate_document.title}".',
+                }, status=400)
 
             # Delete old file safely
             if doc.file:
