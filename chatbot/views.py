@@ -2,6 +2,8 @@ import json
 import re
 import secrets
 import time
+import urllib.error
+import urllib.request
 from hashlib import sha256
 
 from django.conf import settings
@@ -118,6 +120,41 @@ DOCUMENT_KEYWORD_STOPWORDS = {
     'copy', 'copies', 'please', 'share', 'provide', 'download', 'file', 'files', 'document',
     'documents', 'attachment', 'attachments',
 }
+
+
+def _send_transactional_email(recipient_email, subject, message):
+    if settings.BREVO_API_KEY:
+        payload = {
+            'sender': {
+                'name': settings.BREVO_SENDER_NAME,
+                'email': settings.BREVO_SENDER_EMAIL,
+            },
+            'to': [{'email': recipient_email}],
+            'subject': subject,
+            'textContent': message,
+        }
+        request = urllib.request.Request(
+            'https://api.brevo.com/v3/smtp/email',
+            data=json.dumps(payload).encode('utf-8'),
+            headers={
+                'accept': 'application/json',
+                'api-key': settings.BREVO_API_KEY,
+                'content-type': 'application/json',
+            },
+            method='POST',
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                if response.status >= 400:
+                    raise RuntimeError('Brevo email request failed.')
+            return
+        except urllib.error.HTTPError as exc:
+            details = exc.read().decode('utf-8', errors='ignore').strip()
+            raise RuntimeError(details or f'Brevo email request failed with status {exc.code}.') from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError('Unable to reach Brevo email service.') from exc
+
+    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [recipient_email], fail_silently=False)
 
 
 def _chat_sessions_for_user(user):
@@ -502,7 +539,7 @@ def login_view(request):
             user = authenticate(request, username=email, password=password)
             if user is not None:
                 login(request, user)
-                if user.is_staff:
+                if user.is_dashboard_admin:
                     request.session.set_expiry(0)
                     return redirect('dashboard:index')
                 return redirect('chatbot_home')
@@ -905,8 +942,8 @@ def send_otp(request):
         try:
             data = json.loads(request.body)
             email = data.get('email', '').strip().lower()
-            if not (email.endswith('@tip.edu.ph') or email.endswith('@gmail.com')):
-                return JsonResponse({'success': False, 'error': 'Must be a TIP or Gmail email.'})
+            if not email.endswith('@tip.edu.ph'):
+                return JsonResponse({'success': False, 'error': 'Must be a TIP email.'})
 
             if Student.objects.filter(email=email).exists():
                 return JsonResponse({'success': False, 'error': 'This email is already registered.'})
@@ -920,7 +957,7 @@ def send_otp(request):
 
             subject = "Your IntelliChat Verification Code"
             message = f"Hello! Your verification code is: {otp}\n\nThis code will expire in 10 minutes."
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+            _send_transactional_email(email, subject, message)
 
             return JsonResponse({'success': True})
         except Exception as e:
@@ -952,7 +989,7 @@ def send_password_change_otp(request):
 
             subject = "Your Password Change Verification Code"
             message = f"Hello! Your verification code to change your password is: {otp}\n\nThis code will expire in 10 minutes. If you did not request a password change, please ignore this email."
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+            _send_transactional_email(email, subject, message)
 
             return JsonResponse({'success': True})
         except Exception as e:
@@ -1041,7 +1078,7 @@ def init_delete_account(request):
 
             subject = "Account Deletion Verification Code"
             message = f"Hello! Your verification code to irrevocably delete your account is: {otp}\n\nThis code will expire in 10 minutes. If you did not request this, please change your password immediately."
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+            _send_transactional_email(email, subject, message)
 
             return JsonResponse({'success': True})
         except Exception as e:

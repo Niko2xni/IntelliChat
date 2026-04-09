@@ -46,15 +46,16 @@ class DashboardViewTests(TestCase):
         now = timezone.now()
 
         self.admin_user = Student.objects.create_user(
-            email='admin-test@example.com',
+            email='admin-test@intellichat.com',
             username='admin-test',
             password='password123',
             first_name='Admin',
             last_name='Tester',
+            is_staff=True,
+            is_superuser=True,
         )
-        self.admin_user.is_staff = True
         self.admin_user.is_active = True
-        self.admin_user.save(update_fields=['is_staff', 'is_active'])
+        self.admin_user.save(update_fields=['is_active'])
         self.client.force_login(self.admin_user)
 
         self.student_one = Student.objects.create_user(
@@ -139,15 +140,16 @@ class APITests(TestCase):
         now = timezone.now()
 
         self.admin_user = Student.objects.create_user(
-            email='admin-api@example.com',
+            email='admin-api@intellichat.com',
             username='admin-api',
             password='password123',
             first_name='Admin',
             last_name='API',
+            is_staff=True,
+            is_superuser=True,
         )
-        self.admin_user.is_staff = True
         self.admin_user.is_active = True
-        self.admin_user.save(update_fields=['is_staff', 'is_active'])
+        self.admin_user.save(update_fields=['is_active'])
         self.client.force_login(self.admin_user)
 
         self.student_one = Student.objects.create_user(
@@ -217,15 +219,16 @@ class AdminLoggingAndDocumentTests(TestCase):
 
     def setUp(self):
         self.admin_user = Student.objects.create_user(
-            email='admin-logging@example.com',
+            email='admin-logging@intellichat.com',
             username='admin-logging',
             password='password123',
             first_name='Admin',
             last_name='Logger',
+            is_staff=True,
+            is_superuser=True,
         )
-        self.admin_user.is_staff = True
         self.admin_user.is_active = True
-        self.admin_user.save(update_fields=['is_staff', 'is_active'])
+        self.admin_user.save(update_fields=['is_active'])
         self.client.force_login(self.admin_user)
 
     def test_add_faq_creates_admin_audit_log(self):

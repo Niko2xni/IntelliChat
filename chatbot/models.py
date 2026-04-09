@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractUser
 class Student(AbstractUser):
     """Custom user model for IntelliChat students."""
 
+    ADMIN_EMAIL_DOMAIN = '@intellichat.com'
     ACCOUNT_GENERAL = 'general'
     ACCOUNT_STUDENT_LEADER = 'student_leader'
     ACCOUNT_TYPE_CHOICES = [
@@ -14,7 +15,7 @@ class Student(AbstractUser):
 
     email = models.EmailField(
         unique=True,
-        help_text='Must be a TIP (@tip.edu.ph) or Gmail (@gmail.com) email',
+        help_text='Must be a TIP (@tip.edu.ph) email',
     )
 
     profile_picture = models.ImageField(upload_to='profile_pics/', blank=True, null=True)
@@ -33,6 +34,18 @@ class Student(AbstractUser):
     class Meta:
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
+
+    @property
+    def is_dashboard_admin(self):
+        email = (self.email or '').strip().lower()
+        return (
+            self.is_active
+            and self.is_staff
+            and (
+                self.is_superuser
+                or email.endswith(self.ADMIN_EMAIL_DOMAIN)
+            )
+        )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.email})"

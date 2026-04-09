@@ -65,7 +65,7 @@
                                 <label for="email">Email</label>
                                 <div class="input-wrapper {% if errors.email %}input-error{% endif %}">
                                     <i class="fas fa-envelope"></i>
-                                    <input type="email" id="email" name="email" placeholder="Enter your email" value="{{ form_data.email }}" pattern="^[a-zA-Z0-9._%+-]+@(tip\.edu\.ph|gmail\.com)$" title="Please use a TIP or Gmail email" required>
+                                    <input type="email" id="email" name="email" placeholder="Enter your TIP email" value="{{ form_data.email }}" pattern="^[a-zA-Z0-9._%+-]+@tip\.edu\.ph$" title="Please use a valid @tip.edu.ph email address" required>
                                 </div>
                                 {% if errors.email %}
                                     <span class="error-message">{{ errors.email }}</span>
@@ -213,6 +213,15 @@
             startTimer();
         }
 
+        function getCsrfToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'csrftoken') return value;
+            }
+            return '';
+        }
+
         signupForm.addEventListener("submit", function (e) {
             if (isVerified) return;
             e.preventDefault();
@@ -225,8 +234,8 @@
             }
 
             const email = emailField.value.trim().toLowerCase();
-            if (!email.endsWith("@tip.edu.ph") && !email.endsWith("@gmail.com")) {
-                emailField.setCustomValidity("Please use a valid @tip.edu.ph or @gmail.com email address.");
+            if (!email.endsWith("@tip.edu.ph")) {
+                emailField.setCustomValidity("Please use a valid @tip.edu.ph email address.");
                 emailField.reportValidity();
                 return;
             }
@@ -241,7 +250,7 @@
 
             fetch("{% url 'send_otp' %}", {
                 method: "POST",
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                headers: { "X-CSRFToken": getCsrfToken(), "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email, studentNumber: "" })
             })
             .then(res => res.json())
@@ -270,7 +279,7 @@
 
             fetch("{% url 'send_otp' %}", {
                 method: "POST",
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                headers: { "X-CSRFToken": getCsrfToken(), "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email, studentNumber: "" })
             })
             .then(res => res.json())
@@ -305,7 +314,7 @@
 
             fetch("{% url 'verify_otp' %}", {
                 method: "POST",
-                headers: { "X-CSRFToken": "{{ csrf_token }}", "Content-Type": "application/json" },
+                headers: { "X-CSRFToken": getCsrfToken(), "Content-Type": "application/json" },
                 body: JSON.stringify({ otp: enteredOtp })
             })
             .then(res => res.json())

@@ -33,6 +33,9 @@ EMAIL_HOST_USER = os.getenv('EMAIL_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_PASS')
 
 DEFAULT_FROM_EMAIL = f"IntelliChat <{os.getenv('EMAIL_USER')}>"
+BREVO_API_KEY = os.getenv('BREVO_API_KEY')
+BREVO_SENDER_EMAIL = os.getenv('BREVO_SENDER_EMAIL') or os.getenv('EMAIL_USER')
+BREVO_SENDER_NAME = os.getenv('BREVO_SENDER_NAME', 'IntelliChat')
 
 # Application definition
 INSTALLED_APPS = [

@@ -28,7 +28,7 @@ ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'docx', 'png', 'jpg', 'jpeg'}
 
 def is_admin(user):
     """Check if the user is an active administrator."""
-    return user.is_active and user.is_staff
+    return getattr(user, 'is_dashboard_admin', False)
 
 
 def _validate_document_upload(file):
