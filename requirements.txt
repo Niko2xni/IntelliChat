@@ -1,5 +1,5 @@
-Django==4.2.8
-Pillow==10.1.0
+Django>=4.2.8
+Pillow>=10.1.0
 google-genai
 python-dotenv
 psycopg2-binary
