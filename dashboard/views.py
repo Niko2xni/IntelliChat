@@ -5,7 +5,7 @@ from hashlib import sha256
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 from django.http import JsonResponse, FileResponse, Http404
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
 from django.utils import timezone
@@ -252,11 +252,13 @@ def _load_live_dashboard_data():
     }
 
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def dashboard(request):
     """Main admin dashboard view."""
     return render(request, 'dashboard/index.html', _load_live_dashboard_data())
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def admin_profile(request):
     """Admin profile page."""
@@ -293,7 +295,6 @@ def get_inquiries_data(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["GET", "POST"])
-@csrf_exempt
 def update_metrics(request):
     """API endpoint to update dashboard metrics."""
     if request.method == 'POST':
@@ -318,6 +319,7 @@ def update_metrics(request):
     
     return JsonResponse({'status': 'error', 'message': 'Only POST is allowed'}, status=405)
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def knowledge_base(request):
     """Knowledge Base management page."""
@@ -378,7 +380,6 @@ def search_faqs(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
-@csrf_exempt
 def add_faq(request):
     """API endpoint to add a new FAQ."""
     try:
@@ -405,7 +406,6 @@ def add_faq(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
-@csrf_exempt
 def update_faq(request, faq_id):
     """API endpoint to update an existing FAQ."""
     try:
@@ -432,7 +432,6 @@ def update_faq(request, faq_id):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["DELETE"])
-@csrf_exempt
 def delete_faq(request, faq_id):
     """API endpoint to delete an FAQ."""
     try:
@@ -452,6 +451,7 @@ def delete_faq(request, faq_id):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def documents(request):
     """Document Management page."""
@@ -517,7 +517,6 @@ def search_documents(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
-@csrf_exempt
 def upload_document(request):
     """API endpoint to upload a new document."""
     try:
@@ -566,7 +565,6 @@ def upload_document(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["DELETE"])
-@csrf_exempt
 def delete_document(request, doc_id):
     """API endpoint to delete a document."""
     try:
@@ -590,7 +588,6 @@ def delete_document(request, doc_id):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
-@csrf_exempt
 def update_document(request, doc_id):
     """API endpoint to update an existing document."""
     try:
@@ -701,6 +698,7 @@ def format_file_size(bytes_size):
         bytes_size /= 1024.0
     return f"{bytes_size:.1f} TB"
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def logging_monitoring(request):
     """Logging and Monitoring page."""
@@ -741,7 +739,6 @@ def get_notifications(request):
 
 
 @require_http_methods(["POST"])
-@csrf_exempt
 def mark_notification_read(request, notification_id):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
@@ -760,7 +757,6 @@ def mark_notification_read(request, notification_id):
 
 
 @require_http_methods(["POST"])
-@csrf_exempt
 def mark_all_notifications_read(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
@@ -784,7 +780,6 @@ def get_notification_count(request):
 
 
 @require_http_methods(["POST"])
-@csrf_exempt
 def submit_user_request(request):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
@@ -835,7 +830,6 @@ def submit_user_request(request):
 
 
 @require_http_methods(["POST"])
-@csrf_exempt
 def respond_to_user_request(request, notification_id):
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'Authentication required'}, status=401)
@@ -879,6 +873,7 @@ def respond_to_user_request(request, notification_id):
     return JsonResponse({'status': 'success', 'message': 'Response sent successfully'})
 
 
+@ensure_csrf_cookie
 @user_passes_test(is_admin, login_url='login')
 def role_requests(request):
     """Account Elevation Requests management page."""
@@ -889,7 +884,6 @@ def role_requests(request):
 
 @user_passes_test(is_admin, login_url='login')
 @require_http_methods(["POST"])
-@csrf_exempt
 def manage_role_request(request, req_id):
     """API endpoint to accept or reject a role request."""
     action = request.POST.get('action', '').strip().lower()

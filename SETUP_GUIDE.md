@@ -113,13 +113,20 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 ```
 
-## Environment Variables (Optional)
+## Environment Variables
 
-Create a `.env` file in the project root (not included in .gitignore) for sensitive data:
+Create a `.env` file in the project root for sensitive data and deployment settings:
 ```
 DEBUG=True
 SECRET_KEY=your-secret-key-here
 DATABASE_URL=your-database-url
+ALLOWED_HOSTS=127.0.0.1,localhost
+
+# Production security toggles (recommended when DEBUG=False)
+SECURE_SSL_REDIRECT=True
+SESSION_COOKIE_SECURE=True
+CSRF_COOKIE_SECURE=True
+SECURE_HSTS_SECONDS=31536000
 ```
 
 ## Customization
@@ -146,10 +153,13 @@ Edit the chart configuration in `templates/dashboard/index.html` where Chart.js 
 
 For production deployment:
 
-1. Set `DEBUG = False` in `settings.py`
-2. Update `ALLOWED_HOSTS` with your domain
-3. Use `python manage.py collectstatic` for static files
-4. Set up a production database (PostgreSQL recommended)
-5. Use a production WSGI server (Gunicorn, uWSGI, etc.)
+1. Set `DEBUG=False` in `.env`
+2. Set a strong `SECRET_KEY` in `.env`
+3. Update `ALLOWED_HOSTS` with your domain
+4. Keep secure cookie/HTTPS settings enabled (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`)
+5. Use HTTPS in front of Django (reverse proxy/load balancer)
+6. Use `python manage.py collectstatic` for static files
+7. Set up a production database (PostgreSQL recommended)
+8. Use a production WSGI server (Gunicorn, uWSGI, etc.)
 
 See README.md for more information.

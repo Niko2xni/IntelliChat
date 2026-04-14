@@ -8,6 +8,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,9 +26,12 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 
 # SECURITY
-SECRET_KEY = 'django-insecure-change-this-key'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-key')
 
-DEBUG = True
+DEBUG = _env_bool('DEBUG', True)
+
+if not DEBUG and SECRET_KEY == 'django-insecure-change-this-key':
+    raise ValueError('Set SECRET_KEY environment variable when DEBUG is False.')
 
 raw_allowed_hosts = os.getenv('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
@@ -31,6 +41,22 @@ if not ALLOWED_HOSTS:
         '127.0.0.1',
         '.onrender.com',
     ]
+
+if 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
+
+# Security headers/cookies defaults for production-style environments.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', not DEBUG)
+SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool('CSRF_COOKIE_SECURE', not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'same-origin')
+X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000' if not DEBUG else '0'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', not DEBUG)
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
