@@ -725,7 +725,11 @@ def submit_role_request(request):
             f'{requester_display} submitted a Student Leader role request '
             f'for {organization} as {position}.'
         )
-        admin_users = Student.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+        admin_users = [
+            admin
+            for admin in Student.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+            if admin.is_dashboard_admin
+        ]
         admin_notifications = [
             Notification(
                 recipient=admin,

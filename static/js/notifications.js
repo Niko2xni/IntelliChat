@@ -129,22 +129,60 @@ class NotificationSystem {
     }
 
     renderNotificationItem(notif) {
-        const typeClass = `notification-${notif.type}`;
-        const timeAgo = this.getTimeAgo(notif.created_at);
+        const typeValue = String(notif.type || 'info').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        const typeClass = `notification-${typeValue || 'info'}`;
+        const timeAgo = this.escapeHtml(this.getTimeAgo(notif.created_at));
         const canRespond = notif.can_respond ? '1' : '0';
+        const notificationId = Number.parseInt(notif.id, 10);
+        const safeId = Number.isFinite(notificationId) ? notificationId : 0;
+        const safeTitle = this.escapeHtml(notif.title || 'Notification');
+        const safeMessage = this.escapeHtml(notif.message || '');
+        const safeActionUrl = this.sanitizeActionUrl(notif.action_url);
         
         return `
-            <div class="notification-item ${typeClass}" data-notification-id="${notif.id}" data-can-respond="${canRespond}">
+            <div class="notification-item ${typeClass}" data-notification-id="${safeId}" data-can-respond="${canRespond}">
                 <div class="notification-content">
-                    <h4>${notif.title}</h4>
-                    <p>${notif.message}</p>
+                    <h4>${safeTitle}</h4>
+                    <p>${safeMessage}</p>
                     <span class="notification-time">${timeAgo}</span>
                 </div>
                 <div class="notification-actions">
-                    ${notif.action_url ? `<a href="${notif.action_url}" class="notification-action">View</a>` : ''}
+                    ${safeActionUrl ? `<a href="${safeActionUrl}" class="notification-action">View</a>` : ''}
                 </div>
             </div>
         `;
+    }
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    sanitizeActionUrl(url) {
+        const value = String(url || '').trim();
+        if (!value) {
+            return '';
+        }
+
+        if (value.startsWith('/')) {
+            return value;
+        }
+
+        try {
+            const parsedUrl = new URL(value, window.location.origin);
+            const isHttp = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+            if (isHttp && parsedUrl.origin === window.location.origin) {
+                return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+            }
+        } catch (error) {
+            return '';
+        }
+
+        return '';
     }
 
     getTimeAgo(timestamp) {

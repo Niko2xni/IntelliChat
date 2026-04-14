@@ -326,7 +326,7 @@ if(file){
     .then(data => {
         if(data.success) {
             // Because dashboard might have a different nav icon wrapper
-            const navIcons = document.querySelectorAll('.profile-icon img');
+            const navIcons = document.querySelectorAll('.user-btn img, .profile-icon img');
             if(navIcons.length > 0) {
                 navIcons.forEach(icon => icon.src = data.image_url);
             }

@@ -167,6 +167,32 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let currentEditingId = null;
     let faqToDelete = null;
+    const allowedFaqCategories = new Set([
+        'general',
+        'technical',
+        'billing',
+        'account',
+        'features',
+        'security',
+        'integrations',
+        'support',
+    ]);
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+    }
+
+    function normalizeFaqCategory(category) {
+        const normalized = String(category || 'general')
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '');
+        return allowedFaqCategories.has(normalized) ? normalized : 'general';
+    }
 
     // Search functionality
     function performSearch() {
@@ -199,34 +225,46 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         emptyState.style.display = 'none';
-        faqList.innerHTML = faqs.map(faq => `
-            <div class="faq-item" data-id="${faq.id}">
+        faqList.innerHTML = faqs.map(faq => {
+            const parsedId = Number.parseInt(faq.id, 10);
+            const faqId = Number.isFinite(parsedId) ? parsedId : 0;
+            const category = normalizeFaqCategory(faq.category);
+            const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+            const safeTags = Array.isArray(faq.tags)
+                ? faq.tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')
+                : '';
+            const parsedViews = Number.parseInt(faq.view_count, 10);
+            const viewCount = Number.isFinite(parsedViews) ? parsedViews : 0;
+
+            return `
+            <div class="faq-item" data-id="${faqId}">
                 <div class="faq-header">
-                    <h3 class="faq-question">${faq.question}</h3>
+                    <h3 class="faq-question">${escapeHtml(faq.question)}</h3>
                     <div class="faq-actions">
-                        <span class="faq-category category-${faq.category}">${faq.category.charAt(0).toUpperCase() + faq.category.slice(1)}</span>
-                        <button class="edit-btn" data-id="${faq.id}">
+                        <span class="faq-category category-${category}">${escapeHtml(categoryLabel)}</span>
+                        <button class="edit-btn" data-id="${faqId}">
                             <span class="edit-icon">✏️</span>
                         </button>
-                        <button class="delete-btn" data-id="${faq.id}">
+                        <button class="delete-btn" data-id="${faqId}">
                             <span class="delete-icon">🗑️</span>
                         </button>
                     </div>
                 </div>
                 <div class="faq-content">
-                    <p class="faq-answer">${faq.answer}</p>
+                    <p class="faq-answer">${escapeHtml(faq.answer)}</p>
                     <div class="faq-meta">
                         <div class="faq-tags">
-                            ${faq.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                            ${safeTags}
                         </div>
                         <div class="faq-stats">
-                            <span class="view-count">👁️ ${faq.view_count} views</span>
-                            <span class="created-date">📅 ${faq.created_at}</span>
+                            <span class="view-count">👁️ ${viewCount} views</span>
+                            <span class="created-date">📅 ${escapeHtml(faq.created_at)}</span>
                         </div>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         // Reattach event listeners
         attachEventListeners();
@@ -417,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
             transform: translateY(20px);
             transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         `;
-        toast.innerHTML = `<span style="font-size:18px;">${type==='success' ? '✅' : '⚠️'}</span> <span>${message}</span>`;
+        toast.innerHTML = `<span style="font-size:18px;">${type==='success' ? '✅' : '⚠️'}</span> <span>${escapeHtml(message)}</span>`;
         toastContainer.appendChild(toast);
         
         requestAnimationFrame(() => {

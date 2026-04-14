@@ -803,7 +803,11 @@ def submit_user_request(request):
         f"{requester_display} submitted a {request_type_label.lower()} request. {details}"
     ).strip()
 
-    admin_users = request.user.__class__.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+    admin_users = [
+        admin
+        for admin in request.user.__class__.objects.filter(is_active=True, is_staff=True).exclude(id=request.user.id)
+        if getattr(admin, 'is_dashboard_admin', False)
+    ]
     admin_notifications = [
         Notification(
             recipient=admin,
@@ -833,7 +837,10 @@ def submit_user_request(request):
 @require_http_methods(["POST"])
 @csrf_exempt
 def respond_to_user_request(request, notification_id):
-    if not request.user.is_authenticated or not request.user.is_staff:
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Authentication required'}, status=401)
+
+    if not is_admin(request.user):
         return JsonResponse({'error': 'Admin authentication required'}, status=401)
 
     try:
