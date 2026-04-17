@@ -9,6 +9,9 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# Collected static assets
+/staticfiles/
+
 # Environments
 .env
 .venv
@@ -20,6 +23,20 @@ venv.bak/
 
 # User-uploaded media
 media/
+
+# Python build and test artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
 
 # IDE flags
 .idea/

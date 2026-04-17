@@ -189,3 +189,5 @@ For production deployment:
 8. Use a production WSGI server (Gunicorn, uWSGI, etc.)
 
 See README.md for more information.
+
+For Render-specific deployment steps, see [RENDER_DEPLOYMENT_GUIDE.md](RENDER_DEPLOYMENT_GUIDE.md).

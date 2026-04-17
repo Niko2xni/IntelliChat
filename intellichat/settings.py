@@ -16,6 +16,11 @@ def _env_bool(name, default=False):
         return default
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
+
+def _env_list(name, default=''):
+    raw_value = os.getenv(name, default)
+    return [value.strip() for value in raw_value.split(',') if value.strip()]
+
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -51,8 +56,7 @@ DEBUG = _env_bool('DEBUG', True)
 if not DEBUG and SECRET_KEY == 'django-insecure-change-this-key':
     raise ValueError('Set SECRET_KEY environment variable when DEBUG is False.')
 
-raw_allowed_hosts = os.getenv('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(',') if host.strip()]
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS')
 if not ALLOWED_HOSTS:
     ALLOWED_HOSTS = [
         'localhost',
@@ -62,6 +66,10 @@ if not ALLOWED_HOSTS:
 
 if 'testserver' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('testserver')
+
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS')
+if not CSRF_TRUSTED_ORIGINS and not DEBUG:
+    CSRF_TRUSTED_ORIGINS = ['https://*.onrender.com']
 
 # Security headers/cookies defaults for production-style environments.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -110,6 +118,7 @@ if USE_CLOUDINARY_STORAGE:
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -204,21 +213,27 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+default_storage_backend = (
+    'cloudinary_storage.storage.MediaCloudinaryStorage'
+    if USE_CLOUDINARY_STORAGE
+    else 'django.core.files.storage.FileSystemStorage'
+)
+
+STORAGES = {
+    'default': {
+        'BACKEND': default_storage_backend,
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
+
 if USE_CLOUDINARY_STORAGE:
     CLOUDINARY_STORAGE = {
         'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
         'API_KEY': CLOUDINARY_API_KEY,
         'API_SECRET': CLOUDINARY_API_SECRET,
         'SECURE': True,
-    }
-
-    STORAGES = {
-        'default': {
-            'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
-        },
-        'staticfiles': {
-            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
-        },
     }
 
 # Login redirect

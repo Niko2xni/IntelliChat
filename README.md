@@ -243,6 +243,11 @@ Run tests with:
 python manage.py test dashboard
 ```
 
+## Render Deployment
+
+For Render-specific deployment steps, use [RENDER_DEPLOYMENT_GUIDE.md](RENDER_DEPLOYMENT_GUIDE.md).
+The guide also includes a checklist mapped to the keys currently in your local `.env`.
+
 ## Static Files
 
 To collect static files for production:
