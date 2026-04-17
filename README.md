@@ -51,13 +51,45 @@ admin-intellichat/
 pip install -r requirements.txt
 ```
 
-### 2. Run Migrations
+### 2. Configure Cloudinary for Media Uploads
+
+Create a `.env` file in the project root (or update your existing one):
+
+```env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+```
+
+This project now uses Cloudinary as the required runtime storage for profile pictures and uploaded dashboard documents (no local media fallback outside tests).
+
+If you already have files in local `media/`, run this one-time migration command after enabling Cloudinary:
+
+```bash
+python manage.py migrate_media_to_cloudinary --dry-run --skip-missing
+python manage.py migrate_media_to_cloudinary --skip-missing
+```
+
+If Cloudinary rejects malformed files during migration, you can also use:
+
+```bash
+python manage.py migrate_media_to_cloudinary --skip-upload-errors --skip-missing
+```
+
+To remove stale DB file references (missing files or invalid local PDFs) before retrying migration:
+
+```bash
+python manage.py cleanup_media_references --dry-run
+python manage.py cleanup_media_references
+```
+
+### 3. Run Migrations
 
 ```bash
 python manage.py migrate
 ```
 
-### 3. Create Superuser (Optional)
+### 4. Create Superuser (Optional)
 
 ```bash
 python manage.py createsuperuser
@@ -65,7 +97,7 @@ python manage.py createsuperuser
 
 This allows you to access the Django admin panel at `/admin/`
 
-### 4. Load Initial Data (Optional)
+### 5. Load Initial Data (Optional)
 
 Create initial dashboard metrics by accessing the admin panel or using Django shell:
 

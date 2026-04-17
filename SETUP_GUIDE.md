@@ -122,11 +122,37 @@ SECRET_KEY=your-secret-key-here
 DATABASE_URL=your-database-url
 ALLOWED_HOSTS=127.0.0.1,localhost
 
+# Cloudinary media storage (profile pictures and uploaded documents)
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-cloudinary-api-key
+CLOUDINARY_API_SECRET=your-cloudinary-api-secret
+
 # Production security toggles (recommended when DEBUG=False)
 SECURE_SSL_REDIRECT=True
 SESSION_COOKIE_SECURE=True
 CSRF_COOKIE_SECURE=True
 SECURE_HSTS_SECONDS=31536000
+```
+
+Notes:
+- Cloudinary storage is required at runtime for profile pictures and dashboard document uploads.
+- During automated test runs, cloud storage is disabled by default to keep tests local and deterministic.
+
+Optional one-time migration for existing local uploads:
+```bash
+python manage.py migrate_media_to_cloudinary --dry-run --skip-missing
+python manage.py migrate_media_to_cloudinary --skip-missing
+```
+
+If some legacy files are malformed and rejected by Cloudinary, retry with:
+```bash
+python manage.py migrate_media_to_cloudinary --skip-upload-errors --skip-missing
+```
+
+To clean broken media references in the database before retrying migration:
+```bash
+python manage.py cleanup_media_references --dry-run
+python manage.py cleanup_media_references
 ```
 
 ## Customization

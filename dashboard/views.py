@@ -4,7 +4,7 @@ from hashlib import sha256
 
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, HttpResponseRedirect
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.db import models
 from django.contrib.auth.decorators import user_passes_test
@@ -84,13 +84,27 @@ def _find_duplicate_document(uploaded_file, exclude_doc_id=None):
         if not candidate.file:
             continue
 
-        with candidate.file.open('rb') as existing_file:
-            existing_digest = _file_digest(existing_file)
+        try:
+            with candidate.file.open('rb') as existing_file:
+                existing_digest = _file_digest(existing_file)
+        except Exception:
+            # If a stored file cannot be read (e.g., transient cloud error), skip it.
+            continue
 
         if existing_digest == uploaded_digest:
             return candidate
 
     return None
+
+
+def _build_file_download_response(file_field):
+    file_name = file_field.name.split('/')[-1]
+
+    try:
+        return FileResponse(file_field, as_attachment=True, filename=file_name)
+    except Exception:
+        # Fallback for remote storages that cannot be streamed directly.
+        return HttpResponseRedirect(file_field.url)
 
 
 def _safe_mean(values):
@@ -644,9 +658,8 @@ def download_document(request, doc_id):
         # Increment download counter natively
         doc.download_count += 1
         doc.save(update_fields=['download_count'])
-        
-        response = FileResponse(doc.file, as_attachment=True, filename=doc.file.name.split('/')[-1])
-        return response
+
+        return _build_file_download_response(doc.file)
     except Document.DoesNotExist:
         raise Http404("Document not found.")
 

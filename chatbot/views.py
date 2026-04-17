@@ -11,7 +11,7 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db import models
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -269,6 +269,16 @@ def _serialize_chat_document(document):
         'file_size_display': _format_file_size(document.file_size),
         'url': reverse('chatbot_download_document', args=[document.id]),
     }
+
+
+def _build_file_download_response(file_field):
+    file_name = file_field.name.split('/')[-1]
+
+    try:
+        return FileResponse(file_field, as_attachment=True, filename=file_name)
+    except Exception:
+        # Fallback for remote storages that cannot be streamed directly.
+        return HttpResponseRedirect(file_field.url)
 
 
 def _pairwise_history_summary(messages, max_chars):
@@ -916,7 +926,7 @@ def download_chat_document(request, doc_id):
         doc.download_count += 1
         doc.save(update_fields=['download_count'])
 
-        return FileResponse(doc.file, as_attachment=True, filename=doc.file.name.split('/')[-1])
+        return _build_file_download_response(doc.file)
     except Document.DoesNotExist:
         raise Http404("Document not found.")
 
@@ -1131,7 +1141,7 @@ def upload_profile_picture(request):
         if profile_picture.size > 4 * 1024 * 1024:
             return JsonResponse({'success': False, 'error': 'File size exceeds 4MB limit.'})
 
-        if not profile_picture.content_type.startswith('image/'):
+        if not (profile_picture.content_type or '').startswith('image/'):
             return JsonResponse({'success': False, 'error': 'File must be an image.'})
 
         try:
