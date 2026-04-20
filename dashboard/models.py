@@ -1,7 +1,14 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.core.files.storage import FileSystemStorage
 
+# Determine the correct storage backend for raw documents
+if getattr(settings, 'USE_CLOUDINARY_STORAGE', False):
+    from cloudinary_storage.storage import RawMediaCloudinaryStorage
+    document_storage = RawMediaCloudinaryStorage()
+else:
+    document_storage = FileSystemStorage(location=settings.MEDIA_ROOT)
 
 class DashboardMetrics(models.Model):
     total_chats = models.IntegerField(default=0)
@@ -98,7 +105,7 @@ class Document(models.Model):
     
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    file = models.FileField(upload_to='documents/')
+    file = models.FileField(upload_to='documents/', storage=document_storage)
     file_type = models.CharField(max_length=50)  # PDF, DOCX, XLSX, etc
     file_size = models.IntegerField()  # in bytes
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
