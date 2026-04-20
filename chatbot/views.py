@@ -120,6 +120,10 @@ DOCUMENT_KEYWORD_STOPWORDS = {
     'copy', 'copies', 'please', 'share', 'provide', 'download', 'file', 'files', 'document',
     'documents', 'attachment', 'attachments',
 }
+DOCUMENT_ACCESS_RESTRICTION_MESSAGE = (
+    'Document downloads are available only for Student Leader accounts. '
+    'Please submit a Student Leader role request from your profile and wait for admin approval.'
+)
 
 
 def _send_transactional_email(recipient_email, subject, message):
@@ -174,12 +178,18 @@ def _truncate_for_history(value, max_length):
     return f"{compact[:max_length - 3].rstrip()}..."
 
 
-def _serialize_messages(messages):
+def _can_access_documents(user):
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return getattr(user, 'account_type', '') == Student.ACCOUNT_STUDENT_LEADER
+
+
+def _serialize_messages(messages, include_attachments=True):
     return [
         {
             'role': message.role,
             'content': message.content,
-            'attachments': message.attachments or [],
+            'attachments': (message.attachments or []) if include_attachments else [],
             'created_at': message.created_at.isoformat(),
             'time_label': message.created_at.strftime('%I:%M %p').lstrip('0'),
         }
@@ -513,6 +523,7 @@ def chatbot_home(request, session_id=None):
     chat_session_summaries = _chat_session_summaries_for_user(request.user, sessions=chat_sessions)
     current_session = None
     current_messages = []
+    can_access_documents = _can_access_documents(request.user)
 
     if session_id is not None and request.user.is_authenticated:
         current_session = ChatSession.objects.filter(
@@ -521,7 +532,10 @@ def chatbot_home(request, session_id=None):
         ).prefetch_related('messages').first()
         if current_session is None:
             return redirect('chatbot_home')
-        current_messages = _serialize_messages(current_session.messages.all())
+        current_messages = _serialize_messages(
+            current_session.messages.all(),
+            include_attachments=can_access_documents,
+        )
 
     return render(request, 'chatbot/index.html', {
         'chat_sessions': chat_sessions,
@@ -838,7 +852,12 @@ def ask_gemini(request):
 
         chat_session = None
         history_prompt = ''
-        related_documents = _find_related_documents(user_message)
+        related_documents = []
+        can_access_documents = _can_access_documents(request.user)
+        document_intent_detected = DOCUMENT_INTENT_PATTERN.search(user_message) is not None
+
+        if can_access_documents:
+            related_documents = _find_related_documents(user_message)
 
         if request.user.is_authenticated and session_id:
             chat_session = ChatSession.objects.filter(
@@ -851,36 +870,39 @@ def ask_gemini(request):
 
             history_prompt = _build_history_prompt(chat_session.messages.all())
 
-            if not related_documents and DOCUMENT_INTENT_PATTERN.search(user_message):
+            if can_access_documents and not related_documents and document_intent_detected:
                 related_documents = _documents_from_recent_attachments(chat_session)
 
-        prompt = user_message
-        if history_prompt:
-            prompt = f"{history_prompt}\nUser: {user_message}\nAssistant:"
+        if document_intent_detected and not can_access_documents:
+            assistant_reply = DOCUMENT_ACCESS_RESTRICTION_MESSAGE
+        else:
+            prompt = user_message
+            if history_prompt:
+                prompt = f"{history_prompt}\nUser: {user_message}\nAssistant:"
 
-        if related_documents:
-            prompt = f"{_document_context_for_prompt(related_documents)}\n\n{prompt}"
+            if related_documents:
+                prompt = f"{_document_context_for_prompt(related_documents)}\n\n{prompt}"
 
-        response_cache_key = _response_cache_key(
-            user_message,
-            history_prompt,
-            document_ids=[document.id for document in related_documents],
-        )
-        assistant_reply = cache.get(response_cache_key)
-
-        if assistant_reply is None:
-            client = genai.Client(api_key=settings.GEMINI_API_KEY)
-            response = client.models.generate_content(
-                model='gemini-2.5-flash-lite',
-                contents=prompt,
-                config={'system_instruction': SYSTEM_PROMPT}
+            response_cache_key = _response_cache_key(
+                user_message,
+                history_prompt,
+                document_ids=[document.id for document in related_documents],
             )
-            assistant_reply = response.text
-            cache.set(
-                response_cache_key,
-                assistant_reply,
-                timeout=getattr(settings, 'CHAT_RESPONSE_CACHE_TTL', 300),
-            )
+            assistant_reply = cache.get(response_cache_key)
+
+            if assistant_reply is None:
+                client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash-lite',
+                    contents=prompt,
+                    config={'system_instruction': SYSTEM_PROMPT}
+                )
+                assistant_reply = response.text
+                cache.set(
+                    response_cache_key,
+                    assistant_reply,
+                    timeout=getattr(settings, 'CHAT_RESPONSE_CACHE_TTL', 300),
+                )
 
         if request.user.is_authenticated:
             if chat_session is None:
@@ -918,6 +940,9 @@ def ask_gemini(request):
 
 @require_http_methods(["GET"])
 def download_chat_document(request, doc_id):
+    if not _can_access_documents(request.user):
+        raise Http404("Document not found.")
+
     try:
         doc = Document.objects.get(id=doc_id, status='active')
         if not doc.file:
