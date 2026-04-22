@@ -11,6 +11,10 @@ A comprehensive Django-based admin dashboard for the IntelliChat system, providi
 - **Data Management**: Django admin interface for managing dashboard data
 - **RESTful API**: Built-in API endpoints for fetching and updating metrics
 
+## Live Deployment
+
+The deployed IntelliChat website is available at [https://intellichat-main-ni7f.onrender.com](https://intellichat-main-ni7f.onrender.com).
+
 ## Project Structure
 
 ```
