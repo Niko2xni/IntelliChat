@@ -1,10 +1,19 @@
-Django>=4.2.8
-Pillow>=10.1.0
-google-genai
-python-dotenv
-psycopg2-binary
-dj-database-url
-gunicorn
-cloudinary
-django-cloudinary-storage
-whitenoise
+# Core framework
+Django==4.2.8
+Pillow==10.1.0
+
+# Chatbot and AI integration
+google-genai==1.70.0
+
+# Configuration and database
+dj-database-url==3.1.2
+psycopg2-binary==2.9.11
+python-dotenv==1.2.2
+
+# Media storage
+cloudinary==1.44.2
+django-cloudinary-storage==0.3.0
+
+# Production server and static files
+gunicorn==25.3.0
+whitenoise==6.12.0
